@@ -40,29 +40,31 @@ let card c =
     let description desc =
         div [_class "content"] [ encodedText desc ]
     let image = sprintf "cards/%s" c.DisplayImage
-    div [_class "card column is-3"] [
-        div [_class "card-image" ] [
-            figure [_class "image is-4by3"] [
-                img [_src image; _placeholder "" ]
+    div [_class "column is-3"] [
+        div [_class "card"] [
+            div [_class "card-image" ] [
+                figure [_class "image is-4by3"] [
+                    img [_src image; _placeholder "" ]
+                ]
             ]
-        ]
-        div [_class "card-content"] [
-            div [_class "media"] [
-                if c.State = Stopped then startButton c.Name
-                div [_class "media-content"] [
-                    p [_class "title is-4"] [ encodedText c.DisplayName]
-                    p [_class "subtitle title is-6"] [
-                        span [_class (sprintf "tag %s" <| stateToCssClass c.State)] [
-                            encodedText <| c.State.ToString()
+            div [_class "card-content"] [
+                div [_class "media"] [
+                    if c.State = Stopped then startButton c.Name
+                    div [_class "media-content"] [
+                        p [_class "title is-4"] [ encodedText c.DisplayName]
+                        p [_class "subtitle title is-6"] [
+                            span [_class (sprintf "tag %s" <| stateToCssClass c.State)] [
+                                encodedText <| c.State.ToString()
+                            ]
                         ]
                     ]
                 ]
+                match c.State with
+                | Running | Stopped -> ()
+                | Disabled -> description "Container is disabled"
+                | Unknown -> description "Unable to find container"
+                | Error e -> description <| sprintf "Error %s" e
             ]
-            match c.State with
-            | Running | Stopped -> ()
-            | Disabled -> description "Container is disabled"
-            | Unknown -> description "Unable to find container"
-            | Error e -> description <| sprintf "Error %s" e
         ]
     ]
     
