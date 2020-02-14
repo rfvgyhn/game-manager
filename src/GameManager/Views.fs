@@ -42,8 +42,6 @@ let private stateTag state =
     ]
 
 let card c =
-    let description desc =
-        div [_class "content"] [ encodedText desc ]
     let image = sprintf "cards/%s" c.DisplayImage
     div [_class "column is-3"] [
         div [_class "card"] [
@@ -62,11 +60,6 @@ let card c =
                         ]
                     ]
                 ]
-                match c.State with
-                | Running | Stopped -> ()
-                | Disabled -> description "Container is disabled"
-                | Unknown -> description "Unable to find container"
-                | Error e -> description <| sprintf "Error %s" e
             ]
         ]
     ]
