@@ -87,15 +87,29 @@ let private startHandler dockerApi name =
                 
         return! response next ctx
     }
-
+    
+let private (|Prefix|_|) (prefix:string) (str:string) =
+        if str.StartsWith(prefix) then
+            Some(str.Substring(prefix.Length))
+        else
+            None
+let private splitStr (seperator:char) (str:string) = str.Split(seperator)
 let private getUsername = function
+    | Some header ->
+        match header with
+        | Prefix "Basic " token ->
+            token
+            |> System.Convert.FromBase64String
+            |> System.Text.ASCIIEncoding.ASCII.GetString
+            |> splitStr ':'
+            |> Array.head
+        | _ -> "Unknown"
     | None -> "Unknown"
-    | Some (auth: string) -> auth.Split(':').[0]
 
 let private logStartRequest next (ctx: HttpContext) =
     let logger = ctx.GetLogger "GameManager"
     let ipAddress = ctx.Connection.RemoteIpAddress
-    let user = getUsername <| ctx.TryGetRequestHeader "Authorization"
+    let user = ctx.TryGetRequestHeader "Authorization" |> getUsername
     logger.LogInformation <| sprintf "User '%s' from %A requested to start container" user ipAddress
     next ctx
     
