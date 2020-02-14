@@ -29,12 +29,17 @@ let private startButton name =
             i [ _class "fa fa-play" ] []
         ]
     ]
-let private stateToCssClass = function
-    | Stopped -> "is-warning"
-    | Running -> "is-success"
-    | Disabled -> ""
-    | Unknown -> "is-info"
-    | Error _ -> "is-danger"
+let private stateTag state =
+    let (cssClass, title) =
+        match state with
+        | Stopped -> ("is-warning", "")
+        | Running -> ("is-success", "")
+        | Disabled -> ("", "")
+        | Unknown -> ("is-info", "")
+        | Error m -> ("is-danger", m)
+    span [_class (sprintf "tag %s" cssClass); _title title] [
+        encodedText <| state.ToString()
+    ]
 
 let card c =
     let description desc =
@@ -53,9 +58,7 @@ let card c =
                     div [_class "media-content"] [
                         p [_class "title is-4"] [ encodedText c.DisplayName]
                         p [_class "subtitle title is-6"] [
-                            span [_class (sprintf "tag %s" <| stateToCssClass c.State)] [
-                                encodedText <| c.State.ToString()
-                            ]
+                            stateTag c.State
                         ]
                     ]
                 ]

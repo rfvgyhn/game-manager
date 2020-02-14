@@ -35,7 +35,7 @@ module Remote =
         | "paused"
         | "exited"
         | "dead" -> Stopped
-        | _ -> Error "Unknown state"
+        | s -> Error <| sprintf "Unknown state '%s'" s
     
     let api (dockerClient: IDockerClient) (logger : ILogger) =
         let createParameters names =

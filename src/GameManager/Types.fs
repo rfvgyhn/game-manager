@@ -1,7 +1,12 @@
 module Types
 
+open Microsoft.FSharp.Reflection
 open System.Collections.Generic
 open System.Threading.Tasks
+
+let private unionToString (x:'a) = 
+    match FSharpValue.GetUnionFields(x, typeof<'a>) with
+    | case, _ -> case.Name
 
 type ContainerState =
     | Running
@@ -9,6 +14,8 @@ type ContainerState =
     | Unknown
     | Disabled
     | Error of string
+    override this.ToString() = unionToString this
+        
 type RemoteContainer = {
     Name: string
     State: ContainerState
