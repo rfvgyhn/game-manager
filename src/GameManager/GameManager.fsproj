@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <DebugType>portable</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Docker.DotNet" Version="3.125.2" />
+    <PackageReference Include="Giraffe" Version="4.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="Types.fs" />
+    <Compile Include="DockerService.fs" />
+    <Compile Include="Views.fs" />
+    <Compile Include="App.fs" />
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+
+</Project>
