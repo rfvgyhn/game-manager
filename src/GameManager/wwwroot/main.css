@@ -9,6 +9,6 @@ body {
 }
 
 .card-image {
-    background-image: url("cards/placeholder.png");
+    background-image: url("placeholder.png");
     background-size: contain;
 }
