@@ -43,26 +43,26 @@ let private stateTag state =
 
 let card c =
     let image = sprintf "cards/%s" c.DisplayImage
-    div [_class "column is-3"] [
-        div [_class "card"] [
-            div [_class "card-image" ] [
-                figure [_class "image is-4by3"] [
-                    img [_src image; _placeholder "" ]
-                ]
+    
+    li [_class "card"] [
+        div [_class "card-image" ] [
+            figure [_class "image is-4by3"] [
+                img [_src image; _placeholder "" ]
             ]
-            div [_class "card-content"] [
-                div [_class "media"] [
-                    if c.State = Stopped then startButton c.Name
-                    div [_class "media-content"] [
-                        p [_class "title is-4"] [ encodedText c.DisplayName]
-                        p [_class "subtitle title is-6"] [
-                            stateTag c.State
-                        ]
+        ]
+        div [_class "card-content"] [
+            div [_class "media"] [
+                if c.State = Stopped then startButton c.Name
+                div [_class "media-content"] [
+                    p [_class "title is-4"] [ encodedText c.DisplayName]
+                    p [_class "subtitle title is-6"] [
+                        stateTag c.State
                     ]
                 ]
             ]
         ]
     ]
+    
     
 let private noContainersFound =
     let sample = """
@@ -86,6 +86,6 @@ let index containers = layout <| [
     match containers with
     | [] -> noContainersFound
     | _ ->
-        div [_class "columns"] 
+        ul [_class ""] 
             (containers |> List.map card)
 ]
