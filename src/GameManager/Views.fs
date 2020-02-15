@@ -1,5 +1,6 @@
 module Views
 
+open System
 open Types
 open Giraffe
 open GiraffeViewEngine
@@ -42,12 +43,16 @@ let private stateTag state =
     ]
 
 let card c =
-    let image = sprintf "cards/%s" c.DisplayImage
+    let image =
+        if String.IsNullOrEmpty(c.DisplayImage) then
+            "placeholder.png"
+        else
+            sprintf "cards/%s" c.DisplayImage
     
     li [_class "card"] [
         div [_class "card-image" ] [
             figure [_class "image is-4by3"] [
-                img [_src image; _placeholder "" ]
+                img [_src image; ]
             ]
         ]
         div [_class "card-content"] [

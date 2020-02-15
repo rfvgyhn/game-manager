@@ -9,12 +9,8 @@ ul {
     flex-wrap: wrap;
     justify-content: space-evenly;
 }
+
 li {
     width: 320px;
     margin: .5rem;
-}
-
-.card-image {
-    background-image: url("placeholder.png");
-    background-size: contain;
 }
