@@ -36,3 +36,10 @@ form {
     display: inline-flex;
     margin-left: .3rem;
 }
+
+.card.Disabled .card-content, .card.Disabled .card-content .title {
+    color: #cccccc;
+}
+.card.Disabled img {
+    filter: grayscale(100%);
+}
