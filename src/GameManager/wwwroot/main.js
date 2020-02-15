@@ -12,7 +12,7 @@
         });
         
         if (response.ok) {
-            const container = form.parentNode.parentNode.parentNode;
+            const container = form.closest(".card");
             const html = await response.text();
             const fragment = document.createRange().createContextualFragment(html);
             container.replaceWith(fragment);

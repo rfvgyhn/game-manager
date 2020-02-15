@@ -14,3 +14,25 @@ li {
     width: 320px;
     margin: .5rem;
 }
+
+.card-content {
+    position: relative;
+}
+
+.status {
+    position: absolute;
+    top: 0;
+    left: 50%; 
+    transform: translate(-50%, -50%);
+}
+
+.status .button {
+    border-radius: 4px;
+    padding: .3rem;
+    height: auto;
+}
+
+form {
+    display: inline-flex;
+    margin-left: .3rem;
+}

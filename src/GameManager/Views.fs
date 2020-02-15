@@ -25,22 +25,26 @@ let layout (content: XmlNode list) =
 
 let private startButton name =
     let action = sprintf "/containers/%s/start" name
-    form [ _class "media-left"; _action action; _method "POST" ] [
-        button [ _type "submit"; _class "button is-success is-48x48"; _title "Start Container" ] [
+    form [ _class ""; _action action; _method "POST" ] [
+        button [ _type "submit"; _class "button is-success is-small rounded"; _title "Start Container" ] [
             i [ _class "fa fa-play" ] []
         ]
     ]
-let private stateTag state =
+let private tag c =
     let (cssClass, title) =
-        match state with
+        match c.State with
         | Stopped -> ("is-warning", "")
         | Running -> ("is-success", "")
         | Disabled -> ("", "")
         | Unknown -> ("is-info", "")
         | Error m -> ("is-danger", m)
-    span [_class (sprintf "tag %s" cssClass); _title title] [
-        encodedText <| state.ToString()
+    span [_class "status"] [
+        span [_class (sprintf "tag %s" cssClass); _title title] [
+            encodedText <| c.State.ToString()
+        ]
+        if c.State = Stopped then startButton c.Name
     ]
+    
 
 let card c =
     let image =
@@ -49,20 +53,17 @@ let card c =
         else
             sprintf "cards/%s" c.DisplayImage
     
-    li [_class "card"] [
+    li [_class (sprintf "card %A" c.State)] [
         div [_class "card-image" ] [
             figure [_class "image is-4by3"] [
                 img [_src image; ]
             ]
         ]
         div [_class "card-content"] [
+            tag c
             div [_class "media"] [
-                if c.State = Stopped then startButton c.Name
                 div [_class "media-content"] [
                     p [_class "title is-4"] [ encodedText c.DisplayName]
-                    p [_class "subtitle title is-6"] [
-                        stateTag c.State
-                    ]
                 ]
             ]
         ]
