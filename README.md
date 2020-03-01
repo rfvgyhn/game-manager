@@ -4,6 +4,8 @@ Tool to allow your friends to start stopped containers. Useful for when your hos
 Allows you to turn off your game servers when no players are on but not have to be around when your buddies
 want to play.
 
+![Screenshot]
+
 # Server Config File
 
 Managed containers need to be specified in a config file.
@@ -71,4 +73,5 @@ This app doesn't support authentication/authorization out of the box. It is high
 [Traefik]: https://docs.traefik.io/
 [Let's Encrypt]: https://docs.traefik.io/https/acme/
 [Basic Auth]: https://docs.traefik.io/middlewares/basicauth/
+[Screenshot]: screenshot.png?raw=true
 [0]: https://hub.docker.com/r/rfvgyhn/game-manager
