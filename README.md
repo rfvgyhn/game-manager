@@ -14,7 +14,7 @@ Managed containers need to be specified in a config file.
                --name game_manager \
                -v $(pwd)/appsettings.json:/app/appsettings.json \
                -v /etc/localtime:/etc/localtime:ro \
-               -v /var/run/docker.sock:/var/run/docker.sock:ro
+               -v /var/run/docker.sock:/var/run/docker.sock:ro \
                rfvgyhn/game-manager
     
 Sample `appsettings.json`:
@@ -61,7 +61,7 @@ Each container has support for a custom image. Mount the cards volume in order t
                -v $(pwd)/appsettings.json:/app/appsettings.json \
                -v $(pwd)/cards:/app/wwwroot/cards \
                -v /etc/localtime:/etc/localtime:ro \
-               -v /var/run/docker.sock:/var/run/docker.sock:ro
+               -v /var/run/docker.sock:/var/run/docker.sock:ro \
                rfvgyhn/game-manager
                
 # Authorization
