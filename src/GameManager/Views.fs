@@ -23,10 +23,15 @@ let layout (content: XmlNode list) =
         ]
     ]
 
-let private startButton name =
+let private startButton name state =
     let action = sprintf "/containers/%s/start" name
+    let classes =
+        [
+            "button"; "is-small"; "rounded"
+            if state = Starting then "is-info is-loading" else "is-success"
+        ] |> String.concat " "
     form [ _class ""; _action action; _method "POST" ] [
-        button [ _type "submit"; _class "button is-success is-small rounded"; _title "Start Container" ] [
+        button [ _type "submit"; _class classes; _title "Start Container" ] [
             i [ _class "fa fa-play" ] []
         ]
     ]
@@ -35,6 +40,7 @@ let private tag c =
         match c.State with
         | Stopped -> ("is-warning", "")
         | Running -> ("is-success", "")
+        | Starting -> ("is-info", "")
         | Disabled -> ("", "")
         | Unknown -> ("is-info", "")
         | Error m -> ("is-danger", m)
@@ -42,7 +48,7 @@ let private tag c =
         span [_class (sprintf "tag %s" cssClass); _title title] [
             encodedText <| c.State.ToString()
         ]
-        if c.State = Stopped then startButton c.Name
+        if c.State = Stopped || c.State = Starting then startButton c.Name c.State
     ]
     
 
@@ -53,7 +59,7 @@ let card c =
         else
             sprintf "cards/%s" c.DisplayImage
     
-    li [_class (sprintf "card %A" c.State)] [
+    li [_class (sprintf "card %A" c.State); _data "name" c.Name] [
         div [_class "card-image" ] [
             figure [_class "image is-4by3"] [
                 img [_src image; ]

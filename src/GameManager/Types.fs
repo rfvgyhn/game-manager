@@ -10,6 +10,7 @@ let private unionToString (x:'a) =
 
 type ContainerState =
     | Running
+    | Starting
     | Stopped
     | Unknown
     | Disabled

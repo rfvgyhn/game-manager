@@ -25,17 +25,19 @@ module Remote =
         | :? DockerApiException as e -> return Result.Error e.Message
         | :? TaskCanceledException -> return Result.Error "Docker API request timed out"
     }
-        
-    let private mapState dockerState =
-        match dockerState with
-        | "created"
-        | "restarting"
-        | "running" -> Running
-        | "removing"
-        | "paused"
-        | "exited"
-        | "dead" -> Stopped
-        | s -> Error <| sprintf "Unknown state '%s'" s
+    
+    type private Health = Starting | Unhealthy | Healthy | None | Unknown of string
+    let private mapState dockerState health =
+        match dockerState, health with
+        | "running", Starting -> ContainerState.Starting
+        | "running", _
+        | "created", _
+        | "restarting", _ -> Running
+        | "removing", _
+        | "paused", _
+        | "exited", _
+        | "dead", _ -> Stopped
+        | s, _ -> Error <| sprintf "Unknown state '%s'" s
     
     let api (dockerClient: IDockerClient) (logger : ILogger) =
         let createParameters names =
@@ -49,6 +51,18 @@ module Remote =
             parameters.All <- Nullable<bool>(true)
             parameters.Filters <- filter
             parameters
+        let getHealth id = task {
+            let! data = dockerClient.Containers.InspectContainerAsync(id)
+            if data.State.Health = null then
+                return None
+            else
+                return match data.State.Health.Status with
+                       | "starting" -> Starting
+                       | "healthy" -> Healthy
+                       | "unhealthy" -> Unhealthy
+                       | "none" -> None
+                       | s -> Unknown s
+        }            
         
         { getContainers = fun names -> 
               match names with
@@ -58,26 +72,37 @@ module Remote =
                   let! containers = dockerClient.Containers.ListContainersAsync(parameters)
                   let getName (c : ContainerListResponse) = c.Names.[0].[1..] // Trim first char since docker prepends a '/'
                   logger.LogDebug(sprintf "Found Containers: %s" (String.Join(", ", containers |> Seq.map getName)))
-                  
+                  let! healthMapResult =
+                      containers
+                      |> Seq.map (fun c -> task {
+                          let! health = getHealth c.ID
+                          return (c.ID, health)})
+                      |> Task.WhenAll
+                  let healthMap = healthMapResult |> dict
                   return containers
-                         |> Seq.map (fun c -> getName c, mapState c.State )
+                         |> Seq.map (fun c -> getName c, mapState c.State healthMap.[c.ID])
                          |> Map.ofSeq
                          |> Ok
               }
           >> sendRequest
+          
           getContainerState = fun name -> task {
               let parameters = createParameters [ name ]
               let! containers = dockerClient.Containers.ListContainersAsync(parameters)
               
               match containers |> List.ofSeq with
               | [] -> return Result.Error <| sprintf "Couldn't find container named %s" name
-              | c::[] -> return Ok <| mapState c.State
+              | c::[] ->
+                  let! health = getHealth c.ID
+                  return Ok <| mapState c.State health
               | _::_ -> return Result.Error <| sprintf "Multiple containers found with filter name=%s" name
           } >> sendRequest
           
           startContainer = fun name -> task {
               match! dockerClient.Containers.StartContainerAsync(name, null) with
-              | true -> return Ok Running
-              | false -> return Result.Error "Unable to start container"         
+              | false -> return Result.Error "Unable to start container"    
+              | true ->
+                  let! health = getHealth name
+                  return Ok <| mapState "running" health
           } >> sendRequest
         }

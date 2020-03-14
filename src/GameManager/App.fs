@@ -65,7 +65,7 @@ let private indexHandler dockerApi =
             
         return! view next ctx
     }
-        
+
 let private startHandler dockerApi name =
     fun next (ctx: HttpContext) -> task {
         let! container = getContainer name dockerApi ctx
@@ -74,20 +74,31 @@ let private startHandler dockerApi name =
             match container.State with
             | Error e ->
                 task { return ServerErrors.INTERNAL_ERROR e }
-            | Running | Disabled | Unknown ->
+            | Running | Starting | Disabled | Unknown ->
                 task { return RequestErrors.BAD_REQUEST "Can only start a stopped container" }
             | Stopped ->
                 task {
-                    let! result = (dockerApi.startContainer container.Name)
-
-                    match result with
+                    match! dockerApi.startContainer container.Name with
                     | Ok state -> return htmlView (Views.card { container with State = state })
                     | Result.Error m -> return ServerErrors.INTERNAL_ERROR m
                 }
                 
         return! response next ctx
     }
-    
+
+let private statusHandler dockerApi name =
+    fun next (ctx: HttpContext) -> task {
+        let! container = getContainer name dockerApi ctx
+        let response =
+            match container.State with
+            | Error e ->
+                ServerErrors.INTERNAL_ERROR e
+            | Running | Starting | Disabled | Unknown | Stopped ->
+                htmlView (Views.card container)
+                
+        return! response next ctx
+    }
+
 let private (|Prefix|_|) (prefix:string) (str:string) =
         if str.StartsWith(prefix) then
             Some(str.Substring(prefix.Length))
@@ -116,6 +127,7 @@ let private logStartRequest next (ctx: HttpContext) =
 let webApp dockerApi : HttpHandler =
     choose [
         GET  >=> route  "/" >=> indexHandler dockerApi
+        GET  >=> routef "/containers/%s" (statusHandler dockerApi)
         POST >=> logStartRequest >=>
                  routef "/containers/%s/start" (startHandler dockerApi)
         RequestErrors.NOT_FOUND "Not Found"
