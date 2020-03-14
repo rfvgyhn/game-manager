@@ -8,9 +8,9 @@ open Types
 
 module Dummy =
     let api = {
-        getContainers = fun names -> task { return [ "asdf", Stopped ] |> Map.ofList |> Ok }
-        getContainerState = fun id -> task { return Ok Stopped }
-        startContainer = fun id -> task { return Ok Running }
+        getContainers = fun _ -> task { return [ "asdf", Stopped ] |> Map.ofList |> Ok }
+        getContainerState = fun _ -> task { return Ok Stopped }
+        startContainer = fun _ -> task { return Ok Running }
     }
     
 module Remote =
@@ -72,7 +72,7 @@ module Remote =
               match containers |> List.ofSeq with
               | [] -> return Result.Error <| sprintf "Couldn't find container named %s" name
               | c::[] -> return Ok <| mapState c.State
-              | c::tail -> return Result.Error <| sprintf "Multiple containers found with filter name=%s" name
+              | _::_ -> return Result.Error <| sprintf "Multiple containers found with filter name=%s" name
           } >> sendRequest
           
           startContainer = fun name -> task {
