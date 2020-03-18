@@ -33,9 +33,10 @@ type Container = {
     Name: string
     Enabled: bool
     State: ContainerState
+    Notes: string
 } with
     static member Unknown =
-        { DisplayName = "Unknown"; DisplayImage = ""; Name = "Unknown"; Enabled = false; State = Unknown  }
+        { DisplayName = "Unknown"; DisplayImage = ""; Name = "Unknown"; Notes = ""; Enabled = false; State = Unknown  }
 
 type ContainerConfig() =
     member val Containers = List<Container>()

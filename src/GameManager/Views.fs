@@ -72,6 +72,9 @@ let card c =
                     p [_class "title is-4"] [ encodedText c.DisplayName]
                 ]
             ]
+            div [ _class "content" ] [
+                encodedText c.Notes
+            ]
         ]
     ]
     

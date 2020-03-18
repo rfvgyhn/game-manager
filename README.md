@@ -25,7 +25,8 @@ Sample `appsettings.json`:
                 "DisplayName": "Container1 - Name",
                 "DisplayImage": "container1.png",
                 "Name": "container_name",
-                "Enabled": true
+                "Enabled": true,
+                "Notes": "Some notes about this container"
             },
             {
                 "DisplayName": "Container2 - Name",
@@ -51,6 +52,7 @@ DisplayName  | string  | The text that shows up in the card title
 DisplayImage | string  | Path to card image relative to the `cards` directory
 Name         | string  | Container name as shown by `docker ps`
 Enabled      | boolean | Allow users to interact with container
+Notes        | string  | Optional text that shows up in the card description
 
 # Card Images
 
