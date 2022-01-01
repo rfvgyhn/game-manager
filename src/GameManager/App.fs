@@ -105,21 +105,22 @@ let private (|Prefix|_|) (prefix:string) (str:string) =
             None
 let private splitStr (seperator:char) (str:string) = str.Split(seperator)
 let private getUsername = function
-    | Some header ->
-        match header with
-        | Prefix "Basic " token ->
-            token
-            |> System.Convert.FromBase64String
-            |> System.Text.ASCIIEncoding.ASCII.GetString
-            |> splitStr ':'
-            |> Array.head
-        | _ -> "Unknown"
-    | None -> "Unknown"
+    | Prefix "Basic " token ->
+        token
+        |> System.Convert.FromBase64String
+        |> System.Text.ASCIIEncoding.ASCII.GetString
+        |> splitStr ':'
+        |> Array.head
+    | header -> header
 
 let private logStartRequest next (ctx: HttpContext) =
     let logger = ctx.GetLogger "GameManager"
     let ipAddress = ctx.Connection.RemoteIpAddress
-    let user = ctx.TryGetRequestHeader "Authorization" |> getUsername
+    let user =
+        ctx.TryGetRequestHeader "Authorization"
+        |> Option.orElseWith (fun () -> ctx.TryGetRequestHeader "Remote-User")
+        |> Option.map getUsername
+        |> Option.defaultValue "Unknown"
     logger.LogInformation <| sprintf "User '%s' from %A requested to start container" user ipAddress
     next ctx
     
