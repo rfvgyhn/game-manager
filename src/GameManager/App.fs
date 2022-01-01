@@ -2,7 +2,6 @@ module GameManager.App
 
 open Microsoft.AspNetCore.Http
 open Giraffe
-open FSharp.Control.Tasks.ContextInsensitive
 open Microsoft.Extensions.Options
 open Microsoft.Extensions.Logging
 open Types

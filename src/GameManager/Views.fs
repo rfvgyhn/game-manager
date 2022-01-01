@@ -2,8 +2,7 @@ module Views
 
 open System
 open Types
-open Giraffe
-open GiraffeViewEngine
+open Giraffe.ViewEngine
 
 let layout (content: XmlNode list) =
     html [] [

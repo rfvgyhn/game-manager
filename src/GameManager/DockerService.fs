@@ -2,7 +2,6 @@ namespace Docker
 
 open System.Collections.Generic
 open System.Threading.Tasks
-open FSharp.Control.Tasks.ContextInsensitive
 open Microsoft.Extensions.Logging
 open Types
 
