@@ -23,7 +23,7 @@ let layout (content: XmlNode list) =
     ]
 
 let private startButton name state =
-    let action = sprintf "/containers/%s/start" name
+    let action = $"/containers/%s{name}/start"
     let classes =
         [
             "button"; "is-small"; "rounded"
@@ -44,7 +44,7 @@ let private tag c =
         | Unknown -> ("is-info", "")
         | Error m -> ("is-danger", m)
     span [_class "status"] [
-        span [_class (sprintf "tag %s" cssClass); _title title] [
+        span [_class $"tag %s{cssClass}"; _title title] [
             encodedText <| c.State.ToString()
         ]
         if c.State = Stopped || c.State = Starting then startButton c.Name c.State
@@ -56,9 +56,9 @@ let card c =
         if String.IsNullOrEmpty(c.DisplayImage) then
             "placeholder.png"
         else
-            sprintf "cards/%s" c.DisplayImage
+            $"cards/%s{c.DisplayImage}"
     
-    li [_class (sprintf "card %A" c.State); _data "name" c.Name] [
+    li [_class $"card %A{c.State}"; _data "name" c.Name] [
         div [_class "card-image" ] [
             figure [_class "image is-4by3"] [
                 img [_src image; ]

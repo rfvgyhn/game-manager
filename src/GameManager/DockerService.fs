@@ -36,7 +36,7 @@ module Remote =
         | "paused", _
         | "exited", _
         | "dead", _ -> Stopped
-        | s, _ -> Error <| sprintf "Unknown state '%s'" s
+        | s, _ -> Error $"Unknown state '%s{s}'"
     
     let api (dockerClient: IDockerClient) (logger : ILogger) =
         let createParameters names =
@@ -90,11 +90,11 @@ module Remote =
               let! containers = dockerClient.Containers.ListContainersAsync(parameters)
               
               match containers |> List.ofSeq with
-              | [] -> return Result.Error <| sprintf "Couldn't find container named %s" name
+              | [] -> return Result.Error $"Couldn't find container named %s{name}"
               | c::[] ->
                   let! health = getHealth c.ID
                   return Ok <| mapState c.State health
-              | _::_ -> return Result.Error <| sprintf "Multiple containers found with filter name=%s" name
+              | _::_ -> return Result.Error $"Multiple containers found with filter name=%s{name}"
           } >> sendRequest
           
           startContainer = fun name -> task {

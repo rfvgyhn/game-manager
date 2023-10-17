@@ -121,7 +121,7 @@ let private logStartRequest next (ctx: HttpContext) =
         |> Option.orElseWith (fun () -> ctx.TryGetRequestHeader "Remote-User")
         |> Option.map getUsername
         |> Option.defaultValue "Unknown"
-    logger.LogInformation <| sprintf "User '%s' from %A requested to start container" user ipAddress
+    logger.LogInformation $"User '%s{user}' from %A{ipAddress} requested to start container"
     next ctx
     
 let webApp dockerApi : HttpHandler =
