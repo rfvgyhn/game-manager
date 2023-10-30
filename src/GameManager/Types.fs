@@ -1,14 +1,12 @@
 module Types
 
 open Microsoft.FSharp.Reflection
-open System.Collections.Generic
-open System.Threading.Tasks
 
 let private unionToString (x:'a) = 
     match FSharpValue.GetUnionFields(x, typeof<'a>) with
     | case, _ -> case.Name
 
-type ContainerState =
+type ServerState =
     | Running
     | Starting
     | Stopped
@@ -17,27 +15,41 @@ type ContainerState =
     | Error of string
     override this.ToString() = unionToString this
         
-type RemoteContainer = {
-    Name: string
-    State: ContainerState
-}
-type IDockerApi = {
-    getContainers: string list -> Task<Result<Map<string, ContainerState>, string>>
-    getContainerState: string -> Task<Result<ContainerState, string>>
-    startContainer: string -> Task<Result<ContainerState, string>>
-}
-[<CLIMutable>]
-type Container = {
+type AzureVmConfig = { ResourceGroup: string; VmName: string }
+type DockerConfig = { Name: string }
+[<RequireQualifiedAccess>]
+type ServerType =
+    | AzureVm of AzureVmConfig
+    | Docker of DockerConfig
+
+type Server = {
     DisplayName: string
     DisplayImage: string
-    Name: string
     Enabled: bool
-    State: ContainerState
+    State: ServerState
     Notes: string
+    Type: ServerType
 } with
-    static member Unknown =
-        { DisplayName = "Unknown"; DisplayImage = ""; Name = "Unknown"; Notes = ""; Enabled = false; State = Unknown  }
+    member self.Id =
+        match self.Type with
+        | ServerType.AzureVm c -> $"{c.ResourceGroup}_{c.VmName}"
+        | ServerType.Docker c -> c.Name
 
-type ContainerConfig() =
-    member val Containers = List<Container>()
+[<RequireQualifiedAccess>]
+type ServerConfig = {
+    DisplayName: string
+    DisplayImage: string option
+    Enabled: bool
+    Notes: string option
+    Type: ServerType
+} with
+    member self.AsServer() = {
+        DisplayName = self.DisplayName
+        DisplayImage = self.DisplayImage |> Option.defaultValue ""
+        Enabled = self.Enabled
+        State = ServerState.Unknown
+        Notes = self.Notes |> Option.defaultValue ""
+        Type = self.Type
+    }
+type AppConfig = { Servers: Server list }
 

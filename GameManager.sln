@@ -1,0 +1,27 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{CF95E254-617F-4063-A99C-D51881F53CBB}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "GameManager", "src\GameManager\GameManager.fsproj", "{F4B7D86E-F63C-405A-A41F-E2860BD8FEAD}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{F4B7D86E-F63C-405A-A41F-E2860BD8FEAD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F4B7D86E-F63C-405A-A41F-E2860BD8FEAD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F4B7D86E-F63C-405A-A41F-E2860BD8FEAD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F4B7D86E-F63C-405A-A41F-E2860BD8FEAD}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{F4B7D86E-F63C-405A-A41F-E2860BD8FEAD} = {CF95E254-617F-4063-A99C-D51881F53CBB}
+	EndGlobalSection
+EndGlobal

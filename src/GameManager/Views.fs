@@ -23,14 +23,14 @@ let layout (content: XmlNode list) =
     ]
 
 let private startButton name state =
-    let action = $"/containers/%s{name}/start"
+    let action = $"/servers/%s{name}/start"
     let classes =
         [
             "button"; "is-small"; "rounded"
             if state = Starting then "is-info is-loading" else "is-success"
         ] |> String.concat " "
     form [ _class ""; _action action; _method "POST" ] [
-        button [ _type "submit"; _class classes; _title "Start Container" ] [
+        button [ _type "submit"; _class classes; _title "Start Server" ] [
             i [ _class "fa fa-play" ] []
         ]
     ]
@@ -41,13 +41,13 @@ let private tag c =
         | Running -> ("is-success", "")
         | Starting -> ("is-info", "")
         | Disabled -> ("", "")
-        | Unknown -> ("is-info", "")
+        | ServerState.Unknown -> ("is-info", "")
         | Error m -> ("is-danger", m)
     span [_class "status"] [
         span [_class $"tag %s{cssClass}"; _title title] [
             encodedText <| c.State.ToString()
         ]
-        if c.State = Stopped || c.State = Starting then startButton c.Name c.State
+        if c.State = Stopped || c.State = Starting then startButton c.Id c.State
     ]
     
 
@@ -58,7 +58,7 @@ let card c =
         else
             $"cards/%s{c.DisplayImage}"
     
-    li [_class $"card %A{c.State}"; _data "name" c.Name] [
+    li [_class $"card %A{c.State}"; _data "name" c.Id] [
         div [_class "card-image" ] [
             figure [_class "image is-4by3"] [
                 img [_src image; ]
@@ -78,28 +78,32 @@ let card c =
     ]
     
     
-let private noContainersFound =
-    let sample = """
-"Containers": [{
-    "DisplayName": "Container - Name",
+let private noServersFound =
+    let sample ="""
+"Servers": [{
+    "DisplayName": "Server - Name",
     "DisplayImage": "image/path/relative/to/cards/dir.png",
-    "Name": "container_name",
-    "Enabled": true
+    "Enabled": true,
+    "Type": {
+        "Docker": {
+            "Name": "container_name"
+        }
+    }
 }]"""
     article [ _class "message" ] [
         div [ _class "message-header" ] [
-            p [] [ encodedText "No Containers Found" ]
+            p [] [ encodedText "No Servers Found" ]
         ]
         div [ _class "message-body" ] [
-            p [] [ encodedText "Add some containers to your configuration." ]
+            p [] [ encodedText "Add some servers to your configuration." ]
             pre [] [ encodedText sample ]
         ]
     ]
     
-let index containers = layout <| [
-    match containers with
-    | [] -> noContainersFound
+let index servers = layout <| [
+    match servers with
+    | [] -> noServersFound
     | _ ->
         ul [_class ""] 
-            (containers |> List.map card)
+            (servers |> List.map card)
 ]

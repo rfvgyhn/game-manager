@@ -1,5 +1,8 @@
 module GameManager.Program
 
+open System.IO
+open System.Text.Json
+open System.Text.Json.Serialization
 open Docker.DotNet
 open System
 open Microsoft.AspNetCore.Builder
@@ -10,7 +13,6 @@ open Microsoft.Extensions.Logging
 open Microsoft.Extensions.DependencyInjection
 open Giraffe
 open Microsoft.AspNetCore
-open Microsoft.Extensions.Configuration
 open Types
 
 let errorHandler (ex : Exception) (logger : ILogger) =
@@ -24,10 +26,6 @@ let configureCors (builder : CorsPolicyBuilder) =
            |> ignore
 
 let configureApp (app : IApplicationBuilder) =
-    //let dockerApi = Docker.Dummy.api
-    let dockerClient = app.ApplicationServices.GetService<IDockerClient>()
-    let logger = app.ApplicationServices.GetRequiredService<ILoggerFactory>().CreateLogger("GameManager.DockerService")
-    let dockerApi = Docker.Remote.api dockerClient logger
     let env = app.ApplicationServices.GetService<IWebHostEnvironment>()
     (match env.IsDevelopment() with
     | true  -> app.UseDeveloperExceptionPage()
@@ -35,20 +33,31 @@ let configureApp (app : IApplicationBuilder) =
         .UseCors(configureCors)
         .UseStaticFiles()
         .UseResponseCaching()
-        .UseGiraffe <| App.webApp dockerApi
+        .UseGiraffe <| App.webApp
+
+// Can't use built-in configuration builder since it can't bind DUs
+let getConfig() =
+    let jsonOptions = JsonFSharpOptions.Default()
+                          .WithUnionExternalTag()
+                          .WithUnionNamedFields()
+                          .WithUnionUnwrapRecordCases()
+                          .WithSkippableOptionFields()
+                          .ToJsonSerializerOptions()
+    use stream = File.OpenRead("appsettings.json")
+    let servers = JsonSerializer.Deserialize<{|Servers: ServerConfig list|}>(stream, jsonOptions).Servers
+                  |> List.map (fun s -> s.AsServer())
+    { Servers = servers }
 
 let configureServices (services : IServiceCollection) =
-    let serviceProvider = services.BuildServiceProvider()
-    let config = serviceProvider.GetService<IConfiguration>()
-    let createClient =
-        (new DockerClientConfiguration(Uri("unix:///var/run/docker.sock"))).CreateClient()
-        
+    let createClient = (new DockerClientConfiguration(Uri("unix:///var/run/docker.sock"))).CreateClient()
+    let config = getConfig() 
+    
     services
         .AddResponseCaching()
         .AddCors()
         .AddGiraffe()
         .AddSingleton<IDockerClient>(createClient)
-        .Configure<ContainerConfig>(config)
+        .AddSingleton<AppConfig>(config)
         .AddDataProtection() |> ignore
 
 let configureLogging (builder : ILoggingBuilder) =

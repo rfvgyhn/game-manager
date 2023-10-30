@@ -1,101 +1,95 @@
 module GameManager.App
 
+open Docker.DotNet
 open Microsoft.AspNetCore.Http
 open Giraffe
-open Microsoft.Extensions.Options
 open Microsoft.Extensions.Logging
 open Types
-
-let private getConfig<'T> (ctx: HttpContext) =
-    ctx.GetService<IOptionsMonitor<'T>>().CurrentValue
     
-let private getContainerConfig (ctx: HttpContext) =
-    (getConfig<ContainerConfig> ctx).Containers |> List.ofSeq
+let private getServerConfig (ctx: HttpContext) =
+    ctx.GetService<AppConfig>().Servers
     
 let private getLogger (ctx: HttpContext) = ctx.GetLogger "GameManager"
-    
-let private getContainer name dockerApi (ctx: HttpContext) =
-    getContainerConfig ctx
-    |> List.tryFind (fun c -> c.Name = name)
-    |> Option.map (fun c -> task {
-            if not c.Enabled then
-                return { c with State = Disabled }
-            else
-                let! state = dockerApi.getContainerState c.Name
-                match state with
-                | Ok s -> return { c with State = s }
-                | Result.Error e -> return { c with State = Error e }
-       })
-    |> Option.defaultValue (task { return Container.Unknown })
 
-let private getContainers dockerApi ctx = task {
-    let enabledContainersNames =
-        getContainerConfig ctx
+let private makeRequest (ctx: HttpContext) server =
+    let dockerApi = ctx.GetService<IDockerClient>()
+    let logger = getLogger ctx
+    match server.Type with
+    | ServerType.AzureVm _ -> Server.Request.AzureVm (logger, dockerApi, server.Id)
+    | ServerType.Docker _ -> Server.Request.Docker (logger, dockerApi, server.Id)
+
+let private getServer id (ctx: HttpContext) =
+    getServerConfig ctx
+    |> List.tryFind (fun c -> c.Id = id)
+    |> Option.map (fun server -> task {
+        if not server.Enabled then
+            return { server with State = Disabled }
+        else
+            let request = makeRequest ctx server
+            match! Server.getState request with
+            | Ok s -> return { server with State = s }
+            | Result.Error e -> return { server with State = Error e }
+       })
+
+let private getServers (ctx: HttpContext) = task {
+    let dockerClient = ctx.GetService<IDockerClient>()
+    let logger = getLogger ctx
+    let enabledServerNames =
+        getServerConfig ctx
         |> List.filter (fun c -> c.Enabled)
-        |> List.map (fun c -> c.Name)
+        |> List.map (fun c -> c.Id)
     
-    let! remoteContainers = dockerApi.getContainers enabledContainersNames
-        
+    let! serverStates = Server.getStates { Logger = logger; AzureClient = dockerClient, []; DockerClient = dockerClient, enabledServerNames }
+    
     return
-        match remoteContainers with
-        | Result.Error m -> Result.Error m
-        | Ok remote ->
-           getContainerConfig ctx
-           |> List.map (fun c ->
-               let state =
-                    if not c.Enabled then Disabled
-                    else remote
-                         |> Map.tryFind(c.Name)
-                         |> Option.defaultValue Unknown
-               { c with State = state })
-           |> Ok
+        getServerConfig ctx
+        |> List.map (fun c ->
+            let state =
+                if not c.Enabled then Disabled
+                else serverStates
+                     |> Map.tryFind(c.Id)
+                     |> Option.map (Result.defaultWith ServerState.Error)
+                     |> Option.defaultValue ServerState.Unknown
+            { c with State = state })
 }
 
-let private indexHandler dockerApi =
+let private indexHandler =
     fun next ctx -> task {
-        let! containers = getContainers dockerApi ctx
+        let! servers = getServers ctx
         
-        let view =
-            match containers with
-            | Result.Error m ->
-                (getLogger ctx).LogError(m)
-                text "Error getting containers"
-            | Ok c -> Views.index c |> htmlView 
+        let view = Views.index servers |> htmlView
             
         return! view next ctx
     }
 
-let private startHandler dockerApi name =
+let private startHandler name =
     fun next (ctx: HttpContext) -> task {
-        let! container = getContainer name dockerApi ctx
-        
-        let! response =
-            match container.State with
-            | Error e ->
-                task { return ServerErrors.INTERNAL_ERROR e }
-            | Running | Starting | Disabled | Unknown ->
-                task { return RequestErrors.BAD_REQUEST "Can only start a stopped container" }
+        match getServer name ctx with
+        | Some s ->
+            let! server = s
+            match server.State with
+            | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
+            | Running | Starting | Disabled | ServerState.Unknown ->
+                return! RequestErrors.BAD_REQUEST "Can only start a stopped server" next ctx
             | Stopped ->
-                task {
-                    match! dockerApi.startContainer container.Name with
-                    | Ok state -> return htmlView (Views.card { container with State = state })
-                    | Result.Error m -> return ServerErrors.INTERNAL_ERROR m
-                }
-                
-        return! response next ctx
+                let request = makeRequest ctx server
+                match! Server.start request with
+                | Ok state -> return! htmlView (Views.card { server with State = state }) next ctx
+                | Result.Error m -> return! ServerErrors.INTERNAL_ERROR m next ctx
+        | None -> return! RequestErrors.NOT_FOUND "" next ctx
     }
 
-let private statusHandler dockerApi name =
+let private statusHandler id =
     fun next (ctx: HttpContext) -> task {
-        let! container = getContainer name dockerApi ctx
-        let response =
-            match container.State with
+        match getServer id ctx with
+        | Some s ->
+            let! server = s
+            match server.State with
             | Error e ->
-                ServerErrors.INTERNAL_ERROR e
-            | Running | Starting | Disabled | Unknown | Stopped ->
-                htmlView (Views.card container)
-                
-        return! response next ctx
+                return! ServerErrors.INTERNAL_ERROR e next ctx
+            | Running | Starting | Disabled | ServerState.Unknown | Stopped ->
+                return! htmlView (Views.card server) next ctx
+        | None -> return! RequestErrors.NOT_FOUND "" next ctx
     }
 
 let private (|Prefix|_|) (prefix:string) (str:string) =
@@ -103,7 +97,7 @@ let private (|Prefix|_|) (prefix:string) (str:string) =
             Some(str.Substring(prefix.Length))
         else
             None
-let private splitStr (seperator:char) (str:string) = str.Split(seperator)
+let private splitStr (separator:char) (str:string) = str.Split(separator)
 let private getUsername = function
     | Prefix "Basic " token ->
         token
@@ -121,14 +115,14 @@ let private logStartRequest next (ctx: HttpContext) =
         |> Option.orElseWith (fun () -> ctx.TryGetRequestHeader "Remote-User")
         |> Option.map getUsername
         |> Option.defaultValue "Unknown"
-    logger.LogInformation $"User '%s{user}' from %A{ipAddress} requested to start container"
+    logger.LogInformation $"User '%s{user}' from %A{ipAddress} requested to start server"
     next ctx
     
-let webApp dockerApi : HttpHandler =
+let webApp : HttpHandler =
     choose [
-        GET  >=> route  "/" >=> indexHandler dockerApi
-        GET  >=> routef "/containers/%s" (statusHandler dockerApi)
+        GET  >=> route  "/" >=> indexHandler
+        GET  >=> routef "/servers/%s" statusHandler
         POST >=> logStartRequest >=>
-                 routef "/containers/%s/start" (startHandler dockerApi)
+                 routef "/servers/%s/start" startHandler
         RequestErrors.NOT_FOUND "Not Found"
     ]

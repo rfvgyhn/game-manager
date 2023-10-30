@@ -26,17 +26,17 @@
         if (statusInterval !== null) return;
         
         statusInterval = setInterval(() => {
-            const startingContainers = document.querySelectorAll(".Starting");
-            if (startingContainers.length === 0) {
+            const startingServers = document.querySelectorAll(".Starting");
+            if (startingServers.length === 0) {
                 clearInterval(statusInterval);
                 statusInterval = null;
             }
             else {
-                startingContainers.forEach(async e => {
-                    const response = await fetch(`/containers/${e.dataset.name}`, {method: "GET"});
+                startingServers.forEach(async e => {
+                    const response = await fetch(`/servers/${e.dataset.name}`, {method: "GET"});
                     handleUpdate(response, e)
                         .catch(error => {
-                            console.log(`Error refreshing container status: ${error}`)
+                            console.log(`Error refreshing server status: ${error}`)
                         });
                 });
             }
