@@ -7,6 +7,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Azure.Identity" Version="1.10.3" />
+    <PackageReference Include="Azure.ResourceManager.Compute" Version="1.2.0" />
     <PackageReference Include="Docker.DotNet" Version="3.125.15" />
     <PackageReference Include="FSharp.SystemTextJson" Version="1.2.42" />
     <PackageReference Include="Giraffe" Version="6.2.0" />
@@ -14,7 +16,10 @@
 
   <ItemGroup>
     <Compile Include="Types.fs" />
-    <Compile Include="Server.fs" />
+    <Compile Include="Extensions.fs" />
+    <Compile Include="Azure.fs" />
+    <Compile Include="Docker.fs" />
+    <Compile Include="ServerHost.fs" />
     <Compile Include="Views.fs" />
     <Compile Include="App.fs" />
     <Compile Include="Program.fs" />

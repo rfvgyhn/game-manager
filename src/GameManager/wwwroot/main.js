@@ -1,8 +1,7 @@
 (function() {
-    let statusInterval = null;
-    
     document.addEventListener("submit", onSubmit);
-    watchForStatusUpdates();
+    document.querySelectorAll(".Starting").forEach(pollForUpdate);
+    document.querySelectorAll(".Fetching").forEach(el => getStatus(el).then(pollForUpdate));
     
     async function onSubmit(e) {
         e.preventDefault();
@@ -15,42 +14,54 @@
         });
 
         handleUpdate(response, form.closest(".card"))
-            .then(() => { watchForStatusUpdates(); })
+            .then(pollForUpdate)
             .catch(error => {
                 button.classList.remove("is-loading");
                 alert(`Error: ${error}`)
             });
     }
+
+    async function pollForUpdate(el) {
+        while (true) {
+            if (!el.classList.contains("Starting"))
+                break;
+            
+            await delay(5000);
+            el = await getStatus(el);
+        }
+    }
     
-    function watchForStatusUpdates() {
-        if (statusInterval !== null) return;
-        
-        statusInterval = setInterval(() => {
-            const startingServers = document.querySelectorAll(".Starting");
-            if (startingServers.length === 0) {
-                clearInterval(statusInterval);
-                statusInterval = null;
-            }
-            else {
-                startingServers.forEach(async e => {
-                    const response = await fetch(`/servers/${e.dataset.name}`, {method: "GET"});
-                    handleUpdate(response, e)
-                        .catch(error => {
-                            console.log(`Error refreshing server status: ${error}`)
-                        });
-                });
-            }
-        }, 5000)
+    async function getStatus(el) {
+        const response = await fetch(`/servers/${el.dataset.name}`, {method: "GET"});
+        return handleUpdate(response, el)
+            .catch(error => setError(el, error));
+    }
+    
+    function setError(el, error) {
+        const msg = `Couldn't get server status: ${error}`
+        console.error(msg)
+        el.classList.remove("Starting", "Fetching");
+        el.classList.add("Error");
+        const tag = el.querySelector(".tag");
+        tag.classList.remove("is-loading", "is-info");
+        tag.classList.add("is-danger");
+        tag.title = msg;
+        tag.textContent = "Error";
+    }
+    
+    function delay(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
     }
     
     function handleUpdate(response, container) {
         return new Promise(async (resolve, reject) => {
             if (response.ok) {
-                const html = await response.text();
-                const fragment = document.createRange().createContextualFragment(html);
-                container.replaceWith(fragment);
+                const template = document.createElement("template");
+                template.innerHTML = await response.text();
+                const newContainer = template.content.firstElementChild;
+                container.replaceWith(newContainer);
                 
-                resolve();
+                resolve(newContainer);
             } else {
                 const body = await response.text();
                 const extra = body ? ` - ${body}` : "";

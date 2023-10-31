@@ -1,5 +1,6 @@
 module GameManager.App
 
+open Azure.ResourceManager
 open Docker.DotNet
 open Microsoft.AspNetCore.Http
 open Giraffe
@@ -9,14 +10,17 @@ open Types
 let private getServerConfig (ctx: HttpContext) =
     ctx.GetService<AppConfig>().Servers
     
+let private getClients (ctx: HttpContext) =
+    ctx.GetService<IDockerClient>(), ctx.GetService<ArmClient>()
+    
 let private getLogger (ctx: HttpContext) = ctx.GetLogger "GameManager"
 
-let private makeRequest (ctx: HttpContext) server =
-    let dockerApi = ctx.GetService<IDockerClient>()
+let private buildRequest (ctx: HttpContext) server =
+    let dockerClient, azureClient = getClients ctx
     let logger = getLogger ctx
     match server.Type with
-    | ServerType.AzureVm _ -> Server.Request.AzureVm (logger, dockerApi, server.Id)
-    | ServerType.Docker _ -> Server.Request.Docker (logger, dockerApi, server.Id)
+    | ServerType.AzureVm c -> ServerHost.Request.AzureVm (logger, azureClient, c)
+    | ServerType.Docker _ -> ServerHost.Request.Docker (logger, dockerClient, server.Id)
 
 let private getServer id (ctx: HttpContext) =
     getServerConfig ctx
@@ -25,32 +29,32 @@ let private getServer id (ctx: HttpContext) =
         if not server.Enabled then
             return { server with State = Disabled }
         else
-            let request = makeRequest ctx server
-            match! Server.getState request with
+            let request = buildRequest ctx server
+            match! ServerHost.getState ctx.RequestAborted request with
             | Ok s -> return { server with State = s }
             | Result.Error e -> return { server with State = Error e }
        })
 
 let private getServers (ctx: HttpContext) = task {
-    let dockerClient = ctx.GetService<IDockerClient>()
+    let dockerClient, azureClient = getClients ctx
     let logger = getLogger ctx
-    let enabledServerNames =
-        getServerConfig ctx
-        |> List.filter (fun c -> c.Enabled)
-        |> List.map (fun c -> c.Id)
-    
-    let! serverStates = Server.getStates { Logger = logger; AzureClient = dockerClient, []; DockerClient = dockerClient, enabledServerNames }
+    let enabledServers = getServerConfig ctx |> List.filter (fun s -> s.Enabled)
+    let! serverStates = ServerHost.getStates ctx.RequestAborted {
+         Logger = logger
+         AzureClient = azureClient
+         DockerClient = dockerClient
+         Servers = enabledServers } 
     
     return
         getServerConfig ctx
-        |> List.map (fun c ->
+        |> List.map (fun s ->
             let state =
-                if not c.Enabled then Disabled
+                if not s.Enabled then Disabled
                 else serverStates
-                     |> Map.tryFind(c.Id)
+                     |> Map.tryFind(s)
                      |> Option.map (Result.defaultWith ServerState.Error)
                      |> Option.defaultValue ServerState.Unknown
-            { c with State = state })
+            { s with State = state })
 }
 
 let private indexHandler =
@@ -69,11 +73,11 @@ let private startHandler name =
             let! server = s
             match server.State with
             | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
-            | Running | Starting | Disabled | ServerState.Unknown ->
+            | Running | Starting | Disabled | Stopping | Fetching | ServerState.Unknown ->
                 return! RequestErrors.BAD_REQUEST "Can only start a stopped server" next ctx
             | Stopped ->
-                let request = makeRequest ctx server
-                match! Server.start request with
+                let request = buildRequest ctx server
+                match! ServerHost.start ctx.RequestAborted request with
                 | Ok state -> return! htmlView (Views.card { server with State = state }) next ctx
                 | Result.Error m -> return! ServerErrors.INTERNAL_ERROR m next ctx
         | None -> return! RequestErrors.NOT_FOUND "" next ctx
@@ -87,23 +91,22 @@ let private statusHandler id =
             match server.State with
             | Error e ->
                 return! ServerErrors.INTERNAL_ERROR e next ctx
-            | Running | Starting | Disabled | ServerState.Unknown | Stopped ->
+            | Running | Starting | Disabled | Stopped | Stopping | Fetching | ServerState.Unknown ->
                 return! htmlView (Views.card server) next ctx
         | None -> return! RequestErrors.NOT_FOUND "" next ctx
     }
 
 let private (|Prefix|_|) (prefix:string) (str:string) =
-        if str.StartsWith(prefix) then
-            Some(str.Substring(prefix.Length))
-        else
-            None
-let private splitStr (separator:char) (str:string) = str.Split(separator)
+    if str.StartsWith(prefix) then
+        Some(str.Substring(prefix.Length))
+    else
+        None
 let private getUsername = function
     | Prefix "Basic " token ->
         token
         |> System.Convert.FromBase64String
         |> System.Text.ASCIIEncoding.ASCII.GetString
-        |> splitStr ':'
+        |> String.split ':'
         |> Array.head
     | header -> header
 

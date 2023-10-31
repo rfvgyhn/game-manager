@@ -10,17 +10,23 @@ type ServerState =
     | Running
     | Starting
     | Stopped
+    | Stopping
     | Unknown
     | Disabled
+    | Fetching
     | Error of string
     override this.ToString() = unionToString this
         
-type AzureVmConfig = { ResourceGroup: string; VmName: string }
+type AzureVmConfig = { SubscriptionId: string; ResourceGroup: string; VmName: string }
 type DockerConfig = { Name: string }
 [<RequireQualifiedAccess>]
 type ServerType =
     | AzureVm of AzureVmConfig
     | Docker of DockerConfig
+    with member self.Id =
+          match self with
+          | ServerType.AzureVm c -> $"{c.ResourceGroup}_{c.VmName}"
+          | ServerType.Docker c -> c.Name
 
 type Server = {
     DisplayName: string
@@ -30,10 +36,7 @@ type Server = {
     Notes: string
     Type: ServerType
 } with
-    member self.Id =
-        match self.Type with
-        | ServerType.AzureVm c -> $"{c.ResourceGroup}_{c.VmName}"
-        | ServerType.Docker c -> c.Name
+    member self.Id = self.Type.Id
 
 [<RequireQualifiedAccess>]
 type ServerConfig = {

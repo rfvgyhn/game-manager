@@ -37,10 +37,12 @@ let private startButton name state =
 let private tag c =
     let (cssClass, title) =
         match c.State with
+        | Stopping
         | Stopped -> ("is-warning", "")
         | Running -> ("is-success", "")
         | Starting -> ("is-info", "")
         | Disabled -> ("", "")
+        | Fetching -> ("is-info is-loading", "Fetching status")
         | ServerState.Unknown -> ("is-info", "")
         | Error m -> ("is-danger", m)
     span [_class "status"] [

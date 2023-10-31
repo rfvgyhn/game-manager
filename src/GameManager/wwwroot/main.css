@@ -43,3 +43,28 @@ form {
 .card.Disabled img {
     filter: grayscale(100%);
 }
+
+.tag.is-loading {
+    color: transparent !important;
+    pointer-events: none;
+}
+
+.tag.is-loading::after {
+    left: calc(50% - (1em / 2));
+    top: calc(50% - (1em / 2));
+    position: absolute !important;
+}
+
+.tag.is-loading::after {
+    -webkit-animation: spinAround 500ms infinite linear;
+    animation: spinAround 500ms infinite linear;
+    border: 2px solid #dbdbdb;
+    border-radius: 290486px;
+    border-right-color: transparent;
+    border-top-color: transparent;
+    content: "";
+    display: block;
+    height: 1em;
+    position: relative;
+    width: 1em;
+}

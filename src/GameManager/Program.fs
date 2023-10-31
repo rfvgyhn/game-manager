@@ -3,6 +3,8 @@ module GameManager.Program
 open System.IO
 open System.Text.Json
 open System.Text.Json.Serialization
+open Azure.Identity
+open Azure.ResourceManager
 open Docker.DotNet
 open System
 open Microsoft.AspNetCore.Builder
@@ -51,12 +53,12 @@ let getConfig() =
 let configureServices (services : IServiceCollection) =
     let createClient = (new DockerClientConfiguration(Uri("unix:///var/run/docker.sock"))).CreateClient()
     let config = getConfig() 
-    
     services
         .AddResponseCaching()
         .AddCors()
         .AddGiraffe()
         .AddSingleton<IDockerClient>(createClient)
+        .AddTransient<ArmClient>(fun s -> ArmClient(DefaultAzureCredential()))
         .AddSingleton<AppConfig>(config)
         .AddDataProtection() |> ignore
 
