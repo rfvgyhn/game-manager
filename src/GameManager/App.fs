@@ -55,6 +55,7 @@ let private getServers (ctx: HttpContext) = task {
                      |> Option.map (Result.defaultWith ServerState.Error)
                      |> Option.defaultValue ServerState.Unknown
             { s with State = state })
+        |> List.sortWith (fun s1 s2 -> compare (not s1.Enabled, s1.DisplayName) (not s2.Enabled, s2.DisplayName))
 }
 
 let private indexHandler =
