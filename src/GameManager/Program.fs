@@ -10,6 +10,7 @@ open System
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Cors.Infrastructure
 open Microsoft.AspNetCore.Hosting
+open Microsoft.Extensions.Configuration
 open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
 open Microsoft.Extensions.DependencyInjection
@@ -50,22 +51,32 @@ let getConfig() =
                   |> List.map (fun s -> s.AsServer())
     { Servers = servers }
     
-let createArmClient (serverProvider: IServiceProvider) =
-    let env = serverProvider.GetService<IWebHostEnvironment>()
-    let options = DefaultAzureCredentialOptions()
-    
-    if not (env.IsDevelopment()) then
-        options.ExcludeAzureCliCredential <- true
-        options.ExcludeAzureDeveloperCliCredential <- true
-        options.ExcludeAzurePowerShellCredential <- true
-        //options.ExcludeEnvironmentCredential <- true
-        options.ExcludeInteractiveBrowserCredential <- true
-        //options.ExcludeManagedIdentityCredential <- true
-        options.ExcludeSharedTokenCacheCredential <- true
-        options.ExcludeVisualStudioCodeCredential <- true
-        options.ExcludeVisualStudioCredential <- true
-        options.ExcludeWorkloadIdentityCredential <- true
-    let credential = DefaultAzureCredential(options)
+let createArmClient (serviceProvider: IServiceProvider) =
+    let env = serviceProvider.GetService<IWebHostEnvironment>()
+    let credential : Azure.Core.TokenCredential =
+        if not (env.IsDevelopment()) then
+            let options = DefaultAzureCredentialOptions()
+            options.ExcludeAzureCliCredential <- true
+            options.ExcludeAzureDeveloperCliCredential <- true
+            options.ExcludeAzurePowerShellCredential <- true
+            //options.ExcludeEnvironmentCredential <- true
+            options.ExcludeInteractiveBrowserCredential <- true
+            //options.ExcludeManagedIdentityCredential <- true
+            options.ExcludeSharedTokenCacheCredential <- true
+            options.ExcludeVisualStudioCodeCredential <- true
+            options.ExcludeVisualStudioCredential <- true
+            options.ExcludeWorkloadIdentityCredential <- true
+            DefaultAzureCredential(options)
+        else
+            let config = serviceProvider.GetService<IConfiguration>()
+            let tenantId = config["AzureTenantId"]
+            let clientId = config["AzureClientId"]
+            let clientSecret = config["AzureClientSecret"]
+            if tenantId <> null && clientId <> null && clientSecret <> null then
+                ClientSecretCredential(tenantId, clientId, clientSecret)
+            else
+                DefaultAzureCredential()
+                
     ArmClient(credential)
 
 let configureServices (services : IServiceCollection) =
