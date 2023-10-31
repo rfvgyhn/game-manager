@@ -82,13 +82,25 @@ let card c =
     
 let private noServersFound =
     let sample ="""
-"Servers": [{
-    "DisplayName": "Server - Name",
-    "DisplayImage": "image/path/relative/to/cards/dir.png",
-    "Enabled": true,
-    "Type": {
-        "Docker": {
-            "Name": "container_name"
+"Servers": [
+    {
+        "DisplayName": "Server 1",
+        "DisplayImage": "image/path/relative/to/cards/dir.png",
+        "Type": {
+            "Docker": {
+                "Name": "container_name"
+            }
+        }
+    },
+    {
+        "DisplayName": "Server 2",
+        "Enabled": false,
+        "Type": {
+            "AzureVm": {
+                "VmName": "vm-name",
+                "ResourceGroup": "rg-name",
+                "SubscriptionId": "8d8d9eb6-4031-4a60-b10a-94a18605d2a9"
+            }
         }
     }
 }]"""
