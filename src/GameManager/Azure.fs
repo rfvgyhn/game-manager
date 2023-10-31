@@ -8,18 +8,18 @@ open Azure.ResourceManager.Compute
 open Microsoft.Extensions.Logging
 open Types
 
-type private Statuses = { Provisioning: string option; Power: string }
+type private Statuses = { Provisioning: string option; Power: string option }
 let private mapStatuses (statuses: Statuses) =
-    // todo: check to see how the provisioning state affects the power state
     //  https://learn.microsoft.com/en-us/azure/virtual-machines/states-billing#power-states-and-billing
     match statuses.Provisioning, statuses.Power with
-    | _, "creating" -> ServerState.Starting
-    | _, "starting" -> ServerState.Starting
-    | _, "running" -> ServerState.Running
-    | _, "stopping" -> ServerState.Stopping
-    | _, "stopped" -> ServerState.Stopped
-    | _, "deallocating" -> ServerState.Stopping
-    | _, "deallocated" -> ServerState.Stopped
+    | Some "updating", None -> ServerState.Starting
+    | _, Some "creating" -> ServerState.Starting
+    | _, Some "starting" -> ServerState.Starting
+    | _, Some "running" -> ServerState.Running
+    | _, Some "stopping" -> ServerState.Stopping
+    | _, Some "stopped" -> ServerState.Stopped
+    | _, Some "deallocating" -> ServerState.Stopping
+    | _, Some "deallocated" -> ServerState.Stopped
     | _ -> ServerState.Unknown
 
 let private sendRequest (logger: ILogger) fn = task {
@@ -54,10 +54,7 @@ let getState (logger: ILogger) (client: ArmClient) ct config =
                 let powerState = getCode "PowerState" 
                 let provisioningState = getCode "ProvisioningState"
                 
-                match powerState with
-                | None -> return err()
-                | Some s ->
-                    return mapStatuses { Power = s; Provisioning = provisioningState } |> Ok
+                return mapStatuses { Power = powerState; Provisioning = provisioningState } |> Ok
         else
             return err()
     }
