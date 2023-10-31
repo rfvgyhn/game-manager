@@ -33,7 +33,7 @@ let private sendRequest (logger: ILogger) fn = task {
     | e -> return err e
 }   
 
-let getState logger (client: ArmClient) ct config =
+let getState (logger: ILogger) (client: ArmClient) ct config =
     task {
         let err() = Result.Error "Unable to get status"
         let resId = VirtualMachineResource.CreateResourceIdentifier(config.SubscriptionId, config.ResourceGroup, config.VmName)
@@ -41,18 +41,23 @@ let getState logger (client: ArmClient) ct config =
         let! view = vm.InstanceViewAsync(ct)
         
         if view.HasValue then
-            let getCode (str: string) =
-                view.Value.Statuses
-                |> Seq.choose (fun s -> if s.Code.StartsWith(str) then Some s.Code else None)
-                |> Seq.tryHead
-                |> Option.map (String.split '/' >> Array.last >> String.toLowerInvariant)
-            let powerState = getCode "PowerState" 
-            let provisioningState = getCode "ProvisioningState"
-            
-            match powerState with
-            | None -> return err()
-            | Some s ->
-                return mapStatuses { Power = s; Provisioning = provisioningState } |> Ok
+            if view.Value.Statuses.Count = 0 then
+                logger.LogWarning("ARM client credential is lacking permission 'Microsoft.Compute/virtualMachines/instanceView/read' for VM '{ResourceGroup}/{VmName}'",
+                                  config.ResourceGroup, config.VmName)
+                return err()
+            else
+                let getCode (str: string) =
+                    view.Value.Statuses
+                    |> Seq.choose (fun s -> if s.Code.StartsWith(str) then Some s.Code else None)
+                    |> Seq.tryHead
+                    |> Option.map (String.split '/' >> Array.last >> String.toLowerInvariant)
+                let powerState = getCode "PowerState" 
+                let provisioningState = getCode "ProvisioningState"
+                
+                match powerState with
+                | None -> return err()
+                | Some s ->
+                    return mapStatuses { Power = s; Provisioning = provisioningState } |> Ok
         else
             return err()
     }
