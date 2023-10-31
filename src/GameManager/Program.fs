@@ -49,16 +49,34 @@ let getConfig() =
     let servers = JsonSerializer.Deserialize<{|Servers: ServerConfig list|}>(stream, jsonOptions).Servers
                   |> List.map (fun s -> s.AsServer())
     { Servers = servers }
+    
+let createArmClient (serverProvider: IServiceProvider) =
+    let env = serverProvider.GetService<IWebHostEnvironment>()
+    let options = DefaultAzureCredentialOptions()
+    
+    if not (env.IsDevelopment()) then
+        options.ExcludeAzureCliCredential <- true
+        options.ExcludeAzureDeveloperCliCredential <- true
+        options.ExcludeAzurePowerShellCredential <- true
+        //options.ExcludeEnvironmentCredential <- true
+        options.ExcludeInteractiveBrowserCredential <- true
+        //options.ExcludeManagedIdentityCredential <- true
+        options.ExcludeSharedTokenCacheCredential <- true
+        options.ExcludeVisualStudioCodeCredential <- true
+        options.ExcludeVisualStudioCredential <- true
+        options.ExcludeWorkloadIdentityCredential <- true
+    let credential = DefaultAzureCredential(options)
+    ArmClient(credential)
 
 let configureServices (services : IServiceCollection) =
-    let createClient = (new DockerClientConfiguration(Uri("unix:///var/run/docker.sock"))).CreateClient()
+    let dockerClient = (new DockerClientConfiguration(Uri("unix:///var/run/docker.sock"))).CreateClient()
     let config = getConfig() 
     services
         .AddResponseCaching()
         .AddCors()
         .AddGiraffe()
-        .AddSingleton<IDockerClient>(createClient)
-        .AddTransient<ArmClient>(fun s -> ArmClient(DefaultAzureCredential()))
+        .AddSingleton<IDockerClient>(dockerClient)
+        .AddTransient<ArmClient>(createArmClient)
         .AddSingleton<AppConfig>(config)
         .AddDataProtection() |> ignore
 
