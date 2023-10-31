@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
-    <TargetFramework>net7.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <DebugType>portable</DebugType>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <UserSecretsId>6a448cdd-7269-4714-9687-a5d66cfbcf5b</UserSecretsId>
