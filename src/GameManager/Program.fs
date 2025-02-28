@@ -10,6 +10,7 @@ open System
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Cors.Infrastructure
 open Microsoft.AspNetCore.Hosting
+open Microsoft.AspNetCore.HttpOverrides
 open Microsoft.Extensions.Configuration
 open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
@@ -30,6 +31,7 @@ let configureCors (builder : CorsPolicyBuilder) =
 
 let configureApp (app : IApplicationBuilder) =
     let env = app.ApplicationServices.GetService<IWebHostEnvironment>()
+    app.UseForwardedHeaders() |> ignore
     (match env.IsDevelopment() with
     | true  -> app.UseDeveloperExceptionPage()
     | false -> app.UseGiraffeErrorHandler errorHandler)
@@ -83,6 +85,7 @@ let configureServices (services : IServiceCollection) =
     let dockerClient = (new DockerClientConfiguration(Uri("unix:///var/run/docker.sock"))).CreateClient()
     let config = getConfig() 
     services
+        .Configure<ForwardedHeadersOptions>(fun (o: ForwardedHeadersOptions) -> o.ForwardedHeaders <- ForwardedHeaders.XForwardedFor)
         .AddResponseCaching()
         .AddCors()
         .AddGiraffe()
