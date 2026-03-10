@@ -38,7 +38,7 @@ let configureApp (app : IApplicationBuilder) =
         .UseCors(configureCors)
         .UseStaticFiles()
         .UseResponseCaching()
-        .UseGiraffe <| App.webApp
+        .UseGiraffe App.webApp
 
 // Can't use built-in configuration builder since it can't bind DUs
 let getConfig() =
@@ -61,10 +61,10 @@ let createArmClient (serviceProvider: IServiceProvider) =
             options.ExcludeAzureCliCredential <- true
             options.ExcludeAzureDeveloperCliCredential <- true
             options.ExcludeAzurePowerShellCredential <- true
+            options.ExcludeBrokerCredential <- true
             //options.ExcludeEnvironmentCredential <- true
             options.ExcludeInteractiveBrowserCredential <- true
             //options.ExcludeManagedIdentityCredential <- true
-            options.ExcludeSharedTokenCacheCredential <- true
             options.ExcludeVisualStudioCodeCredential <- true
             options.ExcludeVisualStudioCredential <- true
             options.ExcludeWorkloadIdentityCredential <- true
@@ -100,10 +100,13 @@ let configureLogging (builder : ILoggingBuilder) =
 
 [<EntryPoint>]
 let main args =
-    WebHost.CreateDefaultBuilder(args)
-        .Configure(Action<IApplicationBuilder> configureApp)
-        .ConfigureServices(configureServices)
-        .ConfigureLogging(configureLogging)
+    Host.CreateDefaultBuilder(args)
+        .ConfigureWebHostDefaults(fun webHostBuilder ->
+            webHostBuilder
+                .Configure(Action<IApplicationBuilder> configureApp)
+                .ConfigureServices(configureServices)
+                .ConfigureLogging(configureLogging)
+                |> ignore)
         .Build()
         .Run()
     0
