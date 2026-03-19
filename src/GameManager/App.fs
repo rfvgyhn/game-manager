@@ -59,15 +59,18 @@ let private getServers (ctx: HttpContext) = task {
 let private seeOther (location: string) : HttpHandler =
     setStatusCode StatusCodes.Status303SeeOther >=> setHttpHeader "Location" location
 
+let private htmlFragment (view: unit -> XmlNode) : HttpFunc -> HttpContext -> HttpFuncResult =
+    view() |> RenderView.AsString.htmlNode |> htmlString
+
 let private fragmentOrRedirect (view: unit -> XmlNode) (location: string) : HttpHandler = fun next ctx ->
     if ctx.IsAjaxRequest() then
-        htmlView (view()) next ctx
+        htmlFragment view next ctx
     else
         seeOther location next ctx
         
 let private fragmentOrError (view: unit -> XmlNode) (error: HttpFunc -> HttpContext -> HttpFuncResult) : HttpHandler = fun next ctx ->
     if ctx.IsAjaxRequest() then
-        htmlView (view()) next ctx
+        htmlFragment view next ctx
     else
         error next ctx
 
