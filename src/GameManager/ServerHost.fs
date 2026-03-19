@@ -2,10 +2,10 @@
 [<RequireQualifiedAccess>]
 module ServerHost
 
-open System.Threading.Tasks
 open Azure.ResourceManager
 open Docker.DotNet
 open Microsoft.Extensions.Logging
+open System.Threading.Tasks
 open Types
 
 [<RequireQualifiedAccess>]
@@ -28,7 +28,12 @@ let getStates ct request : Task<Map<Server, Result<ServerState, string>>> = task
     let! dockerResult = Docker.getStates ct request.Logger request.DockerClient dockerConfigs
     let dockerStates : Map<Server, Result<ServerState, string>> =
         dockerResult
-        |> Result.map (fun m -> m |> Map.map (fun _ -> Ok))
+        |> Result.map (fun result ->
+            dockerConfigs
+            |> List.fold (fun acc (server, _) ->
+                let state = result |> Map.tryFind server |> Option.defaultValue ServerState.Unknown |> Ok
+                Map.add server state acc) Map.empty
+            )
         |> Result.defaultWith (fun e -> dockerConfigs |> Seq.map (fun (s, _) -> s, Result.Error e) |> Map.ofSeq)
     
     let! azureStates = Azure.getStates request.Logger request.AzureClient ct azureConfigs

@@ -43,7 +43,7 @@ let private createParameters (logger: ILogger) names =
                                         names |> List.map (fun n -> (n, true)) |> dict
                                     ) :> IDictionary<string, bool>) ]
                 )
-    logger.LogDebug("Filter: {Names}", String.Join(": ", names))
+    logger.LogTrace("Filter: {Names}", String.Join(", ", names))
     let parameters = ContainersListParameters()
     parameters.All <- Nullable<bool>(true)
     parameters.Filters <- filter
@@ -74,7 +74,7 @@ let getStates ct (logger: ILogger) (client: IDockerClient) configs =
             configs
             |> List.find (fun (_, config) -> getName c = config.Name)
             |> fst
-        logger.LogDebug("Found Containers: {Containers}", String.Join(", ", containers |> Seq.map getName))
+        logger.LogTrace("Found Containers: {Containers}", String.Join(", ", containers |> Seq.map getName))
         let! healthMapResult =
             containers
             |> Seq.map (fun c -> task {

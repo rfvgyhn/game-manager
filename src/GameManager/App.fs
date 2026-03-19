@@ -2,9 +2,16 @@ module GameManager.App
 
 open Azure.ResourceManager
 open Docker.DotNet
-open Microsoft.AspNetCore.Http
+open FSharp.Control
 open Giraffe
+open Giraffe.ViewEngine
+open Microsoft.AspNetCore.Http
+open Microsoft.AspNetCore.Http.Features
+open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
+open System
+open System.Collections.Generic
+open System.Threading
 open Types
     
 let private getServerConfig (ctx: HttpContext) =
@@ -36,27 +43,33 @@ let private getServer id (ctx: HttpContext) =
        })
 
 let private getServers (ctx: HttpContext) = task {
-    let dockerClient, azureClient = getClients ctx
-    let logger = getLogger ctx
-    let enabledServers = getServerConfig ctx |> List.filter (fun s -> s.Enabled)
-    let! serverStates = ServerHost.getStates ctx.RequestAborted {
-         Logger = logger
-         AzureClient = azureClient
-         DockerClient = dockerClient
-         Servers = enabledServers } 
+    let serverStates = ctx.GetService<IStateTracker>().GetAllStates()
     
     return
         getServerConfig ctx
         |> List.map (fun s ->
             let state =
-                if not s.Enabled then Disabled
-                else serverStates
-                     |> Map.tryFind(s)
-                     |> Option.map (Result.defaultWith ServerState.Error)
-                     |> Option.defaultValue ServerState.Unknown
+                serverStates
+                |> Map.tryFind s.Id
+                |> Option.defaultValue ServerState.Unknown
             { s with State = state })
         |> List.sortWith (fun s1 s2 -> compare (not s1.Enabled, s1.DisplayName) (not s2.Enabled, s2.DisplayName))
 }
+
+let private seeOther (location: string) : HttpHandler =
+    setStatusCode StatusCodes.Status303SeeOther >=> setHttpHeader "Location" location
+
+let private fragmentOrRedirect (view: unit -> XmlNode) (location: string) : HttpHandler = fun next ctx ->
+    if ctx.IsAjaxRequest() then
+        htmlView (view()) next ctx
+    else
+        seeOther location next ctx
+        
+let private fragmentOrError (view: unit -> XmlNode) (error: HttpFunc -> HttpContext -> HttpFuncResult) : HttpHandler = fun next ctx ->
+    if ctx.IsAjaxRequest() then
+        htmlView (view()) next ctx
+    else
+        error next ctx
 
 let private indexHandler =
     fun next ctx -> task {
@@ -68,34 +81,81 @@ let private indexHandler =
     }
 
 let private startHandler name =
-    fun next (ctx: HttpContext) -> task {
+    fun next (ctx: HttpContext) -> task {        
         match getServer name ctx with
         | Some s ->
             let! server = s
+            let err msg = fun () -> Views.tag server.Id (ServerState.Error msg)
             match server.State with
-            | Error e -> return! ServerErrors.INTERNAL_ERROR e next ctx
-            | Running | Starting | Disabled | Stopping | Fetching | ServerState.Unknown ->
-                return! RequestErrors.BAD_REQUEST "Can only start a stopped server" next ctx
+            | Error e -> return! fragmentOrError (err e) (ServerErrors.INTERNAL_ERROR e) next ctx
             | Stopped ->
                 let request = buildRequest ctx server
                 match! ServerHost.start ctx.RequestAborted request with
-                | Ok state -> return! htmlView (Views.card { server with State = state }) next ctx
-                | Result.Error m -> return! ServerErrors.INTERNAL_ERROR m next ctx
+                | Ok state -> return! fragmentOrRedirect (fun () -> Views.tag server.Id state) "/" next ctx
+                | Result.Error m ->
+                    return! fragmentOrError (err m) (ServerErrors.INTERNAL_ERROR m) next ctx
+            | _ ->
+                return! RequestErrors.BAD_REQUEST "Can only start a stopped server" next ctx
         | None -> return! RequestErrors.NOT_FOUND "" next ctx
     }
-
-let private statusHandler id =
-    fun next (ctx: HttpContext) -> task {
-        match getServer id ctx with
-        | Some s ->
-            let! server = s
-            match server.State with
-            | Error e ->
-                return! ServerErrors.INTERNAL_ERROR e next ctx
-            | Running | Starting | Disabled | Stopped | Stopping | Fetching | ServerState.Unknown ->
-                return! htmlView (Views.card server) next ctx
-        | None -> return! RequestErrors.NOT_FOUND "" next ctx
-    }
+    
+// TypedResults.ServerSentEvents doesn't support sending comments so setup SSE manually
+// https://github.com/dotnet/aspnetcore/issues/65103
+let sseStatusHandler : HttpHandler = fun next ctx -> task {
+    let statusService = ctx.GetService<IStateTracker>()
+    let connectionTracker = ctx.GetService<IConnectionTracker>()
+    let config = ctx.GetService<AppConfig>()
+    let toMessage (s: ServerStatus) =
+        let now = DateTimeOffset.UtcNow.ToIsoString()
+        if s.State.Current.IsDisabled || s.State.Prev.IsDisabled then
+            let server = { (config.Servers |> List.find (fun c -> c.Id = s.Id))  with State = s.State.Current }
+            Views.card server
+        else
+            Views.tag s.Id s.State.Current
+        |> RenderView.AsString.htmlNode
+        |> (fun fragment -> $"id: %s{now}\ndata: %s{fragment}\n\n")
+        
+    let lastTimestamp =
+        ctx.TryGetRequestHeader "Last-Event-ID"
+        |> Option.bind (fun s ->
+            match DateTimeOffset.TryParse(s) with
+            | true, ts -> Some ts
+            | _ -> None)
+        |> Option.defaultValue DateTimeOffset.MinValue
+    
+    use cts = CancellationTokenSource.CreateLinkedTokenSource(
+        ctx.RequestAborted, 
+        ctx.GetService<IHostApplicationLifetime>().ApplicationStopping
+    )
+    let ct = cts.Token
+    connectionTracker.Increment()
+    try
+        try
+            use statuses = statusService.GetStatusStream lastTimestamp
+            let stream =
+                statuses :> IAsyncEnumerable<ServerStatus>
+                |> TaskSeq.map toMessage
+                |> AsyncEnumerable.merge ct (taskSeq {
+                    let heartbeat = ": heartbeat\n\n"
+                    use timer = new PeriodicTimer(config.SseHeartbeatInterval)
+                    yield heartbeat
+                    while! timer.WaitForNextTickAsync(ct) do
+                        yield heartbeat
+                })
+            
+            ctx.Response.ContentType <- "text/event-stream";
+            ctx.Response.Headers.CacheControl <- "no-cache,no-store";
+            ctx.Response.Headers.Pragma <- "no-cache";
+            ctx.Response.Headers.ContentEncoding <- "identity";
+            ctx.Features.GetRequiredFeature<IHttpResponseBodyFeature>().DisableBuffering();
+            for message in stream do
+                do! ctx.Response.WriteAsync(message, ct)
+        with
+        | :? OperationCanceledException -> ()
+    finally
+        connectionTracker.Decrement()
+    return Some ctx
+}
 
 let private (|Prefix|_|) (prefix:string) (str:string) =
     if str.StartsWith(prefix) then
@@ -125,8 +185,7 @@ let private logStartRequest next (ctx: HttpContext) =
 let webApp : HttpHandler =
     choose [
         GET  >=> route  "/" >=> indexHandler
-        GET  >=> routef "/servers/%s" statusHandler
-        POST >=> logStartRequest >=>
-                 routef "/servers/%s/start" startHandler
+        GET  >=> route  "/sse" >=> sseStatusHandler
+        POST >=> routef "/servers/%s/start" (fun id -> logStartRequest >=> startHandler id)
         RequestErrors.NOT_FOUND "Not Found"
     ]

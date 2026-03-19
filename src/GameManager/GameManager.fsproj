@@ -6,11 +6,12 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <UserSecretsId>6a448cdd-7269-4714-9687-a5d66cfbcf5b</UserSecretsId>
   </PropertyGroup>
-
+  
   <ItemGroup>
     <PackageReference Include="Azure.Identity" Version="1.18.0" />
     <PackageReference Include="Azure.ResourceManager.Compute" Version="1.14.0" />
     <PackageReference Include="Docker.DotNet" Version="3.125.15" />
+    <PackageReference Include="FSharp.Control.TaskSeq" Version="0.6.0" />
     <PackageReference Include="FSharp.SystemTextJson" Version="1.4.36" />
     <PackageReference Include="Giraffe" Version="8.2.0" />
     <PackageReference Update="FSharp.Core" Version="10.0.103" />
@@ -18,11 +19,15 @@
 
   <ItemGroup>
     <Compile Include="Types.fs" />
+    <Compile Include="ConnectionTracker.fs" />
+    <Compile Include="ServerStateTracker.fs" />
     <Compile Include="Extensions.fs" />
     <Compile Include="Azure.fs" />
     <Compile Include="Docker.fs" />
     <Compile Include="ServerHost.fs" />
+    <Compile Include="ViewEngine.fs" />
     <Compile Include="Views.fs" />
+    <Compile Include="PollingBackgroundService.fs" />
     <Compile Include="App.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

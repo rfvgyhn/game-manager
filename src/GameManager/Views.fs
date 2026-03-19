@@ -1,10 +1,11 @@
 module Views
 
+open GameManager.ViewEngine.HtmlElements.MuJs
+open Giraffe.ViewEngine
 open System
 open Types
-open Giraffe.ViewEngine
 
-let layout (content: XmlNode list) =
+let private layout (content: XmlNode list) =
     html [] [
         head [] [
             meta [_charset "utf-8"]
@@ -17,7 +18,12 @@ let layout (content: XmlNode list) =
         body [_class "container"] [
             section [_class "section"] [
                 yield! content                
-            ]            
+            ]
+            script [
+                _src "https://unpkg.com/@digicreon/mujs@1.4.4/dist/mu.min.js"
+                _integrity "sha384-HOmrsf1xbQSkv1hsu7+gOO5LVzWpEJif8c/3sbuupYBt9DTk+PD5cn9khN324tvv"
+                _crossorigin "anonymous"
+            ] []
             script [ _src "/main.js" ] []
         ]
     ]
@@ -29,52 +35,59 @@ let private startButton name state =
             "button"; "is-small"; "rounded"
             if state = Starting then "is-info is-loading" else "is-success"
         ] |> String.concat " "
-    form [ _class ""; _action action; _method "POST" ] [
+    form [ _class ""; _action action; _method "POST"; mu (Mode Patch) ] [
         button [ _type "submit"; _class classes; _title "Start Server" ] [
             i [ _class "fa fa-play" ] []
         ]
     ]
-let private tag c =
-    let (cssClass, title) =
-        match c.State with
+    
+let tag id state =
+    let cssClass, title, text =
+        match state with
         | Stopping
-        | Stopped -> ("is-warning", "")
-        | Running -> ("is-success", "")
-        | Starting -> ("is-info", "")
-        | Disabled -> ("", "")
-        | Fetching -> ("is-info is-loading", "Fetching status")
-        | ServerState.Unknown -> ("is-info", "")
-        | Error m -> ("is-danger", m)
-    span [_class "status"] [
+        | Stopped -> ("is-warning", "", None)
+        | Running -> ("is-success", "", None)
+        | Creating
+        | Created
+        | Starting -> ("is-info", "", None)
+        | Disabled -> ("", "", None)
+        | Initializing s ->
+            let progress = s.Progress |> Option.map (fun p -> $"Initializing {p:P}") |> Option.defaultValue "Initializing"
+            ("is-info is-loading", s.Description |> Option.defaultValue "", Some progress)
+        | Fetching -> ("is-info is-loading", "Fetching status", None)
+        | ServerState.Unknown -> ("is-info", "", None)
+        | Error m -> ("is-danger", m, None)
+
+    span [_class "status"; mu (PatchTarget $"#%s{id} .status") ] [
         span [_class $"tag %s{cssClass}"; _title title] [
-            encodedText <| c.State.ToString()
+            text |> Option.defaultWith(fun () -> state.ToString()) |> encodedText
         ]
-        if c.State = Stopped || c.State = Starting then startButton c.Id c.State
+        if state = Stopped || state = Starting then startButton id state
     ]
     
 
-let card c =
+let card server =
     let image =
-        if String.IsNullOrEmpty(c.DisplayImage) then
+        if String.IsNullOrEmpty(server.DisplayImage) then
             "placeholder.png"
         else
-            $"cards/%s{c.DisplayImage}"
+            $"cards/%s{server.DisplayImage}"
     
-    li [_class $"card %A{c.State}"; _data "name" c.Id] [
+    li [_id server.Id; _class $"card %A{server.State}"; mu (PatchTarget $"#%s{server.Id}")] [
         div [_class "card-image" ] [
             figure [_class "image is-4by3"] [
                 img [_src image; ]
             ]
         ]
         div [_class "card-content"] [
-            tag c
+            tag server.Id server.State
             div [_class "media"] [
                 div [_class "media-content"] [
-                    p [_class "title is-4"] [ encodedText c.DisplayName]
+                    p [_class "title is-4"] [ encodedText server.DisplayName]
                 ]
             ]
             div [ _class "content" ] [
-                encodedText c.Notes
+                encodedText server.Notes
             ]
         ]
     ]
@@ -115,9 +128,13 @@ let private noServersFound =
     ]
     
 let index servers = layout <| [
-    match servers with
-    | [] -> noServersFound
-    | _ ->
-        ul [_class ""] 
-            (servers |> List.map card)
-]
+        match servers with
+        | [] -> noServersFound
+        | _ ->
+            ul [_class ""] 
+                (servers |> List.map card)
+            div [ _id "sse"; mu (Trigger Load); mu (Url "/sse"); mu (Mode Patch); mu (Method Sse) ] []
+            span [ _id "sse-disconnected"; _class "tag is-warning" ] [
+                encodedText "Disconnected. You won't receive status updates."
+            ]
+    ]

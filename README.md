@@ -20,6 +20,8 @@ Managed servers need to be specified in a config file.
 Sample `appsettings.json`:
 
     {
+        "SseHeartbeatInterval": "00:00:30",
+        "StatusPollingInterval": "00:00:05",
         "Servers": [
             {
                 "DisplayName": "Server1 - Name",
@@ -35,6 +37,7 @@ Sample `appsettings.json`:
                 "DisplayName": "Server2 - Name",
                 "DisplayImage": "server2.png",
                 "Enabled": false,
+                "StatusMode": "Push",
                 "Type": {
                     "AzureVm": {
                         "VmName": "vm-name",
@@ -53,19 +56,25 @@ Sample `appsettings.json`:
             }
         }
     }
+### Config
+| Name                       | Type    | Required | Default | Description                                         | 
+|----------------------------|---------|----------|---------|-----------------------------------------------------|
+| SseHeartbeatInterval       | string  | No       | 30 sec  | How often to send SSE heartbeat messages to clients |
+| StatusPollingInterval      | string  | No       | 5 sec   | How often to poll the status of servers             |
 
-
-| Name                        | Type    | Required | Description                                               | 
-|-----------------------------|---------|----------|-----------------------------------------------------------|
-| DisplayName                 | string  | Yes      | The text that shows up in the card title                  |
-| DisplayImage                | string  | No       | Path to card image relative to the `cards` directory      |
-| Enabled                     | boolean | No       | Allow users to interact with container                    |
-| Notes                       | string  | No       | Optional text that shows up in the card description       |
-| Type                        | object  | Yes      | Can be Docker or AzureVM                                  |
-| Type.Docker.Name            | string  | Yes      | Name of docker container                                  |
-| Type.AzureVm.VmName         | string  | Yes      | Name of Azure virtual machine                             |
-| Type.AzureVm.ResourceGroup  | string  | Yes      | Name of the resource group the virtual machine belongs to |
-| Type.AzureVm.SubscriptionId | string  | Yes      | Id of the subscription the resource group belongs to      |
+### Servers
+| Name                        | Type    | Required | Default | Description                                               | 
+|-----------------------------|---------|----------|---------|-----------------------------------------------------------|
+| DisplayName                 | string  | Yes      |         | The text that shows up in the card title                  |
+| DisplayImage                | string  | No       | Empty   | Path to card image relative to the `cards` directory      |
+| Enabled                     | boolean | No       | false   | Allow users to interact with container                    |
+| Notes                       | string  | No       | Empty   | Optional text that shows up in the card description       |
+| StatusMode                  | string  | No       | Pull    | How to retrieve server status (Push/Pull)                 |
+| Type                        | object  | Yes      |         | Can be Docker or AzureVM                                  |
+| Type.Docker.Name            | string  | Yes      |         | Name of docker container                                  |
+| Type.AzureVm.VmName         | string  | Yes      |         | Name of Azure virtual machine                             |
+| Type.AzureVm.ResourceGroup  | string  | Yes      |         | Name of the resource group the virtual machine belongs to |
+| Type.AzureVm.SubscriptionId | string  | Yes      |         | Id of the subscription the resource group belongs to      |
 
 ### Azure Permissions
 In order to start and get the status of VMs, this app needs the following permissions:

@@ -1,22 +1,23 @@
 module GameManager.Program
 
-open System.IO
-open System.Text.Json
-open System.Text.Json.Serialization
+open System.Threading
+open System.Threading.Tasks
 open Azure.Identity
 open Azure.ResourceManager
 open Docker.DotNet
-open System
+open Giraffe
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Cors.Infrastructure
 open Microsoft.AspNetCore.Hosting
 open Microsoft.AspNetCore.HttpOverrides
 open Microsoft.Extensions.Configuration
+open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
-open Microsoft.Extensions.DependencyInjection
-open Giraffe
-open Microsoft.AspNetCore
+open System
+open System.IO
+open System.Text.Json
+open System.Text.Json.Serialization
 open Types
 
 let errorHandler (ex : Exception) (logger : ILogger) =
@@ -41,72 +42,117 @@ let configureApp (app : IApplicationBuilder) =
         .UseGiraffe App.webApp
 
 // Can't use built-in configuration builder since it can't bind DUs
-let getConfig() =
+let parseConfig (config: IConfiguration) =
+    let tryParse defaultValue (value: string) =
+        match TimeSpan.TryParse(value) with
+        | true, value -> value
+        | _ -> defaultValue
     let jsonOptions = JsonFSharpOptions.Default()
                           .WithUnionExternalTag()
                           .WithUnionNamedFields()
                           .WithUnionUnwrapRecordCases()
+                          .WithUnionUnwrapFieldlessTags()
                           .WithSkippableOptionFields()
                           .ToJsonSerializerOptions()
-    use stream = File.OpenRead("appsettings.json")
-    let servers = JsonSerializer.Deserialize<{|Servers: ServerConfig list|}>(stream, jsonOptions).Servers
-                  |> List.map (fun s -> s.AsServer())
-    { Servers = servers }
+    let parseServers fileName =
+        if File.Exists(fileName) then
+            use stream = File.OpenRead(fileName)
+            JsonSerializer.Deserialize<{| Servers: ServerConfig list option|}>(stream, jsonOptions).Servers
+            |> Option.defaultValue []
+        else
+            []
+    let servers =
+        parseServers "appsettings.json"
+        @ parseServers "appsettings.Local.json"
+        |> List.distinctBy _.DisplayName
+        |> List.map _.AsServer()
+    { Servers = servers
+      SseHeartbeatInterval = config["SseHeartbeatInterval"] |> tryParse (TimeSpan.FromSeconds 30.) 
+      StatusPollingInterval = config["StatusPollingInterval"] |> tryParse (TimeSpan.FromSeconds 5.) }
     
 let createArmClient (serviceProvider: IServiceProvider) =
     let env = serviceProvider.GetService<IWebHostEnvironment>()
-    let credential : Azure.Core.TokenCredential =
-        if not (env.IsDevelopment()) then
-            let options = DefaultAzureCredentialOptions()
-            options.ExcludeAzureCliCredential <- true
-            options.ExcludeAzureDeveloperCliCredential <- true
-            options.ExcludeAzurePowerShellCredential <- true
-            options.ExcludeBrokerCredential <- true
-            //options.ExcludeEnvironmentCredential <- true
-            options.ExcludeInteractiveBrowserCredential <- true
-            //options.ExcludeManagedIdentityCredential <- true
-            options.ExcludeVisualStudioCodeCredential <- true
-            options.ExcludeVisualStudioCredential <- true
-            options.ExcludeWorkloadIdentityCredential <- true
-            DefaultAzureCredential(options)
-        else
-            let config = serviceProvider.GetService<IConfiguration>()
-            let tenantId = config["AzureTenantId"]
-            let clientId = config["AzureClientId"]
-            let clientSecret = config["AzureClientSecret"]
-            if tenantId <> null && clientId <> null && clientSecret <> null then
-                ClientSecretCredential(tenantId, clientId, clientSecret)
-            else
-                DefaultAzureCredential()
-                
-    ArmClient(credential)
+    let options = DefaultAzureCredentialOptions(
+        ExcludeAzureCliCredential = true,
+        ExcludeAzureDeveloperCliCredential = true,
+        ExcludeAzurePowerShellCredential = true,
+        ExcludeBrokerCredential = true,
+        ExcludeEnvironmentCredential = true,
+        ExcludeInteractiveBrowserCredential = true,
+        ExcludeManagedIdentityCredential = true,
+        ExcludeVisualStudioCodeCredential = true,
+        ExcludeVisualStudioCredential = true,
+        ExcludeWorkloadIdentityCredential = true)
+    if env.IsDevelopment() then
+        options.ExcludeEnvironmentCredential <- false
+        options.ExcludeAzureCliCredential <- false
+    else
+        options.ExcludeEnvironmentCredential <- false
+        options.ExcludeManagedIdentityCredential <- false
+    
+    ArmClient(DefaultAzureCredential(options))
 
-let configureServices (services : IServiceCollection) =
-    let dockerClient = (new DockerClientConfiguration(Uri("unix:///var/run/docker.sock"))).CreateClient()
-    let config = getConfig() 
+let configureServices (ctx: WebHostBuilderContext) (services : IServiceCollection) =
+    let config = parseConfig ctx.Configuration
     services
         .Configure<ForwardedHeadersOptions>(fun (o: ForwardedHeadersOptions) -> o.ForwardedHeaders <- ForwardedHeaders.XForwardedFor)
         .AddResponseCaching()
         .AddCors()
         .AddGiraffe()
-        .AddSingleton<IDockerClient>(dockerClient)
-        .AddTransient<ArmClient>(createArmClient)
+        .AddSingleton<IDockerClient>(fun _ -> (new DockerClientConfiguration(Uri("unix:///var/run/docker.sock"))).CreateClient() :> IDockerClient)
+        .AddSingleton<ArmClient>(createArmClient)
         .AddSingleton<AppConfig>(config)
+        .AddSingleton<IConnectionTracker, InMemoryConnectionTracker>()
+        .AddSingleton<IStateTracker>(fun _ -> new ServerStateTracker(config.Servers |> List.filter _.Enabled |> List.length) :> IStateTracker)
+        .AddHostedService<PollingBackgroundService>()
         .AddDataProtection() |> ignore
 
 let configureLogging (builder : ILoggingBuilder) =
     builder.AddConsole()
            .AddDebug() |> ignore
-
+           
+let private initStates (services: IServiceProvider) = task {
+    let logger = services.GetService<ILoggerFactory>().CreateLogger($"{nameof(GameManager)}.Program")
+    let statusService = services.GetService<IStateTracker>()
+    let serverConfig = services.GetService<AppConfig>().Servers
+    let enabledServers = serverConfig |> List.filter _.Enabled    
+    let! serverStates =
+        logger.LogInformation("Getting server states")
+        use cts = CancellationTokenSource.CreateLinkedTokenSource(services.GetService<IHostApplicationLifetime>().ApplicationStopping)
+        cts.CancelAfter(TimeSpan.FromSeconds 30.)
+        try
+            ServerHost.getStates cts.Token {
+            Logger = logger
+            AzureClient = services.GetService<ArmClient>()
+            DockerClient = services.GetService<IDockerClient>()
+            Servers = enabledServers
+            }
+        with :? OperationCanceledException -> Task.FromResult(Map.empty)
+    let states = 
+        serverConfig
+        |> List.map (fun s ->
+            let state =
+                if not s.Enabled then
+                    Disabled
+                else
+                    serverStates
+                    |> Map.tryFind s
+                    |> Option.defaultValue (Ok ServerState.Unknown)
+                    |> Result.defaultWith ServerState.Error
+            { s with State = state })
+    logger.LogInformation("Got server states: {states}", states |> List.map (fun s -> $"%s{s.DisplayName} - %A{s.State}") |> String.concat ", ")
+    statusService.Initialize states
+}
 [<EntryPoint>]
 let main args =
-    Host.CreateDefaultBuilder(args)
-        .ConfigureWebHostDefaults(fun webHostBuilder ->
-            webHostBuilder
-                .Configure(Action<IApplicationBuilder> configureApp)
-                .ConfigureServices(configureServices)
-                .ConfigureLogging(configureLogging)
-                |> ignore)
-        .Build()
-        .Run()
+    let app = Host.CreateDefaultBuilder(args).ConfigureWebHostDefaults(fun builder ->
+                    builder
+                        .Configure(Action<IApplicationBuilder> configureApp)
+                        .ConfigureServices(Action<WebHostBuilderContext, IServiceCollection> configureServices)
+                        .ConfigureLogging(configureLogging)
+                        |> ignore
+                 ).Build()
+    
+    (initStates app.Services).GetAwaiter().GetResult()
+    app.Run()
     0

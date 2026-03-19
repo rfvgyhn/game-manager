@@ -1,73 +1,36 @@
 (function() {
-    document.addEventListener("submit", onSubmit);
-    document.querySelectorAll(".Starting").forEach(pollForUpdate);
-    document.querySelectorAll(".Fetching").forEach(el => getStatus(el).then(pollForUpdate));
-    
-    async function onSubmit(e) {
-        e.preventDefault();
-        const form = e.target;
-        const button = form.querySelector("button");
-        
-        button.classList.add("is-loading");
-        const response = await fetch(form.action, {
-            method: "POST"
-        });
-
-        handleUpdate(response, form.closest(".card"))
-            .then(pollForUpdate)
-            .catch(error => {
-                button.classList.remove("is-loading");
-                alert(`Error: ${error}`)
-            });
-    }
-
-    async function pollForUpdate(el) {
-        while (true) {
-            if (!el.classList.contains("Starting"))
-                break;
-            
-            await delay(5000);
-            el = await getStatus(el);
-        }
-    }
-    
-    async function getStatus(el) {
-        const response = await fetch(`/servers/${el.dataset.name}`, {method: "GET"});
-        return handleUpdate(response, el)
-            .catch(error => setError(el, error));
-    }
-    
-    function setError(el, error) {
-        const msg = `Couldn't get server status: ${error}`
-        console.error(msg)
-        el.classList.remove("Starting", "Fetching");
-        el.classList.add("Error");
-        const tag = el.querySelector(".tag");
-        tag.classList.remove("is-loading", "is-info");
-        tag.classList.add("is-danger");
-        tag.title = msg;
-        tag.textContent = "Error";
-    }
-    
-    function delay(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
-    }
-    
-    function handleUpdate(response, container) {
-        return new Promise(async (resolve, reject) => {
-            if (response.ok) {
-                const template = document.createElement("template");
-                template.innerHTML = await response.text();
-                const newContainer = template.content.firstElementChild;
-                container.replaceWith(newContainer);
-                
-                resolve(newContainer);
-            } else {
-                const body = await response.text();
-                const extra = body ? ` - ${body}` : "";
-
-                reject(Error(`${response.status} - ${response.statusText}${extra}`));
-            }
-        });
-    }
+    hookEventSource();
+    const sseUrl = document.getElementById('sse').getAttribute('mu-url');
+    let suppressWarning = false;
+    mu.init({ progress: false });
+    window.addEventListener('beforeunload', () => {
+        suppressWarning = true;
+    });
+    document.addEventListener('submit', (event) => {
+        const btn = event.submitter;
+        if (btn)
+            btn.classList.add('is-loading');
+    });
+    document.addEventListener('mu:fetch-error', e => {
+        if (e.detail.url === sseUrl && !suppressWarning)
+            document.getElementById('sse-disconnected').classList.add('is-visible');
+    });
+    document.addEventListener('sse-opened', e => {
+        if (e.detail.url === sseUrl)
+            document.getElementById('sse-disconnected').classList.remove('is-visible');
+    });
 })();
+
+// µJS doesn't provide a hook into onopen so we use the nuclear option of overriding the EventSource constructor
+function hookEventSource() {
+    const OriginalEventSource = window.EventSource;
+    window.EventSource = function(url, configuration) {
+        const instance = new OriginalEventSource(url, configuration);
+        instance.onopen = () => {
+            document.dispatchEvent(new CustomEvent('sse-opened', { detail: { url: url, source: instance } }));
+        };
+
+        return instance;
+    };
+    window.EventSource.prototype = OriginalEventSource.prototype;
+}

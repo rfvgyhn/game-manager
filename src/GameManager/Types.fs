@@ -1,5 +1,7 @@
 module Types
 
+open System
+open System.Text.Json.Serialization
 open Microsoft.FSharp.Reflection
 
 let private unionToString (x:'a) = 
@@ -7,8 +9,11 @@ let private unionToString (x:'a) =
     | case, _ -> case.Name
 
 type ServerState =
+    | Creating
+    | Created
     | Running
     | Starting
+    | Initializing of {| Description: string option; Progress: float option |}
     | Stopped
     | Stopping
     | Unknown
@@ -27,7 +32,7 @@ type ServerType =
           match self with
           | ServerType.AzureVm c -> $"{c.ResourceGroup}_{c.VmName}"
           | ServerType.Docker c -> c.Name
-
+type ServerStatusMode = Pull | Push
 type Server = {
     DisplayName: string
     DisplayImage: string
@@ -35,6 +40,7 @@ type Server = {
     State: ServerState
     Notes: string
     Type: ServerType
+    StatusMode: ServerStatusMode
 } with
     member self.Id = self.Type.Id
 
@@ -45,14 +51,23 @@ type ServerConfig = {
     Enabled: bool
     Notes: string option
     Type: ServerType
+    [<JsonPropertyName("StatusMode")>]
+    RawStatusMode: ServerStatusMode option
 } with
+    member self.StatusMode = defaultArg self.RawStatusMode Pull
+
     member self.AsServer() = {
         DisplayName = self.DisplayName
         DisplayImage = self.DisplayImage |> Option.defaultValue ""
         Enabled = self.Enabled
-        State = ServerState.Unknown
+        State = if self.Enabled then ServerState.Unknown else ServerState.Disabled
         Notes = self.Notes |> Option.defaultValue ""
         Type = self.Type
+        StatusMode = self.StatusMode
     }
-type AppConfig = { Servers: Server list }
+type AppConfig = {
+    Servers: Server list
+    SseHeartbeatInterval: TimeSpan
+    StatusPollingInterval: TimeSpan
+}
 
