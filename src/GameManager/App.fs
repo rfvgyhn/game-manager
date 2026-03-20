@@ -1,16 +1,20 @@
 module GameManager.App
 
-open Azure.ResourceManager
 open Docker.DotNet
 open FSharp.Control
 open Giraffe
 open Giraffe.ViewEngine
+open Microsoft.AspNetCore.Authentication
+open Microsoft.AspNetCore.Authentication.JwtBearer
+open Microsoft.AspNetCore.Hosting
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Http.Features
 open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
 open System
 open System.Collections.Generic
+open System.Linq
+open System.Text.Json.Nodes
 open System.Threading
 open Types
     
@@ -18,7 +22,7 @@ let private getServerConfig (ctx: HttpContext) =
     ctx.GetService<AppConfig>().Servers
     
 let private getClients (ctx: HttpContext) =
-    ctx.GetService<IDockerClient>(), ctx.GetService<ArmClient>()
+    ctx.GetService<IDockerClient>(), ctx.GetService<Azure.IAzureClient>()
     
 let private getLogger (ctx: HttpContext) = ctx.GetLogger "GameManager"
 
@@ -160,6 +164,82 @@ let sseStatusHandler : HttpHandler = fun next ctx -> task {
     return Some ctx
 }
 
+let private unauthorized (ctx: HttpContext) =
+    ctx.SetStatusCode 401
+    Some ctx
+
+let private requireQueryValue description key (value: string option) : HttpHandler = fun next ctx -> task {
+    let logger = getLogger ctx
+    let isValid =
+        match value with
+        | Some s when not (String.IsNullOrWhiteSpace s) ->
+            ctx.TryGetQueryStringValue key |> Option.contains s
+        | _ ->
+            logger.LogWarning($"%s{description} is empty. All events will be denied.")
+            false
+
+    if isValid then
+        return! next ctx
+    else
+        return unauthorized ctx
+}
+
+// https://learn.microsoft.com/en-us/azure/event-grid/end-point-validation-event-grid-events-schema#validation-details
+let private echoAegValidationCode : HttpHandler = fun next ctx -> task {
+    match ctx.TryGetRequestHeader "aeg-event-type" with
+    | Some "SubscriptionValidation" ->
+        let (?>) = JsonNode.getValue
+        let! events = ctx.BindJsonAsync<JsonArray>()
+        let validationCode = events.FirstOrDefault() ?> "data" ?> "validationCode" |> JsonNode.asStr |> Option.defaultValue ""
+        return! json {| validationResponse = validationCode |} next ctx
+    | _ ->
+        return! next ctx
+}
+
+let private requireEventGridAuth : HttpHandler = fun next ctx -> task {
+    let! authResult = ctx.AuthenticateAsync(JwtBearerDefaults.AuthenticationScheme)
+    if authResult.Succeeded then
+        return! next ctx
+    else
+        return unauthorized ctx
+}
+
+let private devEnvBypass (innerHandler : HttpHandler) : HttpHandler = fun next ctx ->
+    let env = ctx.GetService<IWebHostEnvironment>()
+    if env.IsDevelopment() then
+        (getLogger ctx).LogInformation("Dev environment detected. Bypassing authentication for {path}", ctx.Request.Path.Value)
+        next ctx
+    else
+        innerHandler next ctx
+    
+let private azureStatusWebHook : HttpHandler = fun next ctx -> task {
+    let logger = getLogger ctx
+    let! events = ctx.BindJsonAsync<JsonArray>()
+    
+    events
+    |> Seq.sortByDescending (fun n -> DateTimeOffset.Parse(n["eventTime"].ToJsonString()))
+    |> Seq.head
+    |> (fun node ->
+        match node["subject"] |> JsonNode.asStr |> Option.defaultValue "" with
+        | Azure.VmPath (subId, resGroup, vmName) ->
+            let id = Azure.formatId resGroup vmName
+            let isMonitored() =
+                getServerConfig ctx |> List.exists (fun s -> s.Id = id && s.Enabled && s.StatusMode.IsPush)            
+            
+            if isMonitored() then
+                let stateTracker = ctx.GetService<IStateTracker>()
+                let event, timestamp = Azure.AzureEvent.parse node
+                let state = stateTracker.GetState id
+                let newState = Azure.AzureEvent.mapToState state.Prev event
+                stateTracker.Notify id newState timestamp
+            else
+                logger.LogWarning("Received event for {ServerId} but it isn't configured for push events", id)
+        | _ ->
+            logger.LogWarning("Unexpected Azure event: {json}", node)
+    )
+    return! setStatusCode 200 next ctx
+}
+
 let private (|Prefix|_|) (prefix:string) (str:string) =
     if str.StartsWith(prefix) then
         Some(str.Substring(prefix.Length))
@@ -185,10 +265,15 @@ let private logStartRequest next (ctx: HttpContext) =
     logger.LogInformation $"User '%s{user}' from %A{ipAddress} requested to start server"
     next ctx
     
-let webApp : HttpHandler =
+let webApp eventGridSharedSecret : HttpHandler =
     choose [
         GET  >=> route  "/" >=> indexHandler
         GET  >=> route  "/sse" >=> sseStatusHandler
         POST >=> routef "/servers/%s/start" (fun id -> logStartRequest >=> startHandler id)
+        POST >=> route  "/webhooks/azure/eventgrid"
+                 >=> requireQueryValue "EventGrid shared secret" "code" eventGridSharedSecret
+                 >=> echoAegValidationCode
+                 >=> (requireEventGridAuth |> devEnvBypass)
+                 >=> azureStatusWebHook
         RequestErrors.NOT_FOUND "Not Found"
     ]

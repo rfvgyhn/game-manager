@@ -1,6 +1,5 @@
 namespace GameManager
 
-open Azure.ResourceManager
 open Docker.DotNet
 open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
@@ -11,7 +10,7 @@ open Types
 type PollingBackgroundService(
     statusService: IStateTracker,
     dockerClient: IDockerClient,
-    azureClient: ArmClient,
+    azureClient: Azure.IAzureClient,
     config: AppConfig,
     connectionTracker: IConnectionTracker,
     logger: ILogger<PollingBackgroundService>) =

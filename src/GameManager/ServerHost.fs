@@ -2,7 +2,6 @@
 [<RequireQualifiedAccess>]
 module ServerHost
 
-open Azure.ResourceManager
 open Docker.DotNet
 open Microsoft.Extensions.Logging
 open System.Threading.Tasks
@@ -10,12 +9,12 @@ open Types
 
 [<RequireQualifiedAccess>]
 type Request =
-    | AzureVm of (ILogger * ArmClient * AzureVmConfig)
+    | AzureVm of (ILogger * Azure.IAzureClient * AzureVmConfig)
     | Docker of (ILogger * IDockerClient * string)
     
 type GetAllRequest = {
     DockerClient: IDockerClient
-    AzureClient: ArmClient
+    AzureClient: Azure.IAzureClient
     Servers: Server list
     Logger: ILogger
 }

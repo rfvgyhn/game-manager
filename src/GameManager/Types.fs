@@ -66,6 +66,7 @@ type ServerConfig = {
         StatusMode = self.StatusMode
     }
 type AppConfig = {
+    AzureEventGridSharedSecret: string option
     Servers: Server list
     SseHeartbeatInterval: TimeSpan
     StatusPollingInterval: TimeSpan

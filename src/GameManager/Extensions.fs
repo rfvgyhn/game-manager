@@ -7,7 +7,12 @@ open Microsoft.AspNetCore.Http
 module String =
     let split (separator: char) (input: string) = input.Split(separator)
     let toLowerInvariant (input: string) = input.ToLowerInvariant()
-    
+
+module JsonNode =
+    open System.Text.Json.Nodes
+    let asStr (prop: JsonNode) = prop |> Option.ofObj |> Option.map _.ToString()
+    let getValue (node: JsonNode) (key: string) = if isNull node then null else node[key]
+
 module AsyncEnumerable =
     open System.Collections.Generic
     open System.Threading

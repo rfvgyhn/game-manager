@@ -1,0 +1,225 @@
+@topic = /subscriptions/{{subId}}/resourceGroups/{{resourceGroup}}
+@subject = {{topic}}/providers/Microsoft.Compute/virtualMachines/{{vmName}}
+@azureWebHookUrl = localhost:5000/webhooks/azure/eventgrid?code=1234
+
+### Azure Subscription Validation
+POST {{azureWebHookUrl}}
+Content-Type: application/json
+aeg-event-type: SubscriptionValidation
+
+[{
+  "data": {
+    "validationCode": "asdf"
+  }
+}]
+
+### Azure Deallocate Start Event
+POST {{azureWebHookUrl}}
+Content-Type: application/json
+
+[{
+  "id": "event-id",
+  "topic": "{{topic}}",
+  "subject": "{{subject}}",
+  "data": {
+    "operationName": "Microsoft.Compute/virtualMachines/deallocate/action",
+    "status": "Succeeded"
+  },
+  "eventType": "Microsoft.Resources.ResourceActionStart",
+  "eventTime": "{{$isoTimestamp}}"
+}]
+### Azure Deallocate Success Event
+POST {{azureWebHookUrl}}
+Content-Type: application/json
+
+[{
+  "id": "event-id",
+  "topic": "{{topic}}",
+  "subject": "{{subject}}",
+  "data": {
+    "operationName": "Microsoft.Compute/virtualMachines/deallocate/action",
+    "status": "Succeeded"
+  },
+  "eventType": "Microsoft.Resources.ResourceActionSuccess",
+  "eventTime": "{{$isoTimestamp}}"
+}]
+### Azure Deallocate Cancel Event
+POST {{azureWebHookUrl}}
+Content-Type: application/json
+
+[{
+  "id": "event-id",
+  "topic": "{{topic}}",
+  "subject": "{{subject}}",
+  "data": {
+    "operationName": "Microsoft.Compute/virtualMachines/deallocate/action",
+    "status": "Succeeded"
+  },
+  "eventType": "Microsoft.Resources.ResourceActionCancel",
+  "eventTime": "{{$isoTimestamp}}"
+}]
+### Azure Deallocate Failure Event
+POST {{azureWebHookUrl}}
+Content-Type: application/json
+
+[{
+  "id": "event-id",
+  "topic": "{{topic}}",
+  "subject": "{{subject}}",
+  "data": {
+    "operationName": "Microsoft.Compute/virtualMachines/deallocate/action",
+    "status": "Succeeded"
+  },
+  "eventType": "Microsoft.Resources.ResourceActionFailure",
+  "eventTime": "{{$isoTimestamp}}"
+}]
+### Azure Start Start Event
+POST {{azureWebHookUrl}}
+Content-Type: application/json
+
+[{
+  "id": "event-id",
+  "topic": "{{topic}}",
+  "subject": "{{subject}}",
+  "data": {
+    "operationName": "Microsoft.Compute/virtualMachines/start/action",
+    "status": "Succeeded"
+  },
+  "eventType": "Microsoft.Resources.ResourceActionStart",
+  "eventTime": "{{$isoTimestamp}}"
+}]
+### Azure Start Success Event
+POST {{azureWebHookUrl}}
+Content-Type: application/json
+
+[{
+  "id": "event-id",
+  "topic": "{{topic}}",
+  "subject": "{{subject}}",
+  "data": {
+    "operationName": "Microsoft.Compute/virtualMachines/start/action",
+    "status": "Succeeded"
+  },
+  "eventType": "Microsoft.Resources.ResourceActionSuccess",
+  "eventTime": "{{$isoTimestamp}}"
+}]
+### Azure Start Cancel Event
+POST {{azureWebHookUrl}}
+Content-Type: application/json
+
+[{
+  "id": "event-id",
+  "topic": "{{topic}}",
+  "subject": "{{subject}}",
+  "data": {
+    "operationName": "Microsoft.Compute/virtualMachines/start/action",
+    "status": "Succeeded"
+  },
+  "eventType": "Microsoft.Resources.ResourceActionCancel",
+  "eventTime": "{{$isoTimestamp}}"
+}]
+### Azure Start Failure Event
+POST {{azureWebHookUrl}}
+Content-Type: application/json
+
+[{
+  "id": "event-id",
+  "topic": "{{topic}}",
+  "subject": "{{subject}}",
+  "data": {
+    "operationName": "Microsoft.Compute/virtualMachines/start/action",
+    "status": "Succeeded"
+  },
+  "eventType": "Microsoft.Resources.ResourceActionFailure",
+  "eventTime": "{{$isoTimestamp}}"
+}]
+### Azure Poweroff Start Event
+POST {{azureWebHookUrl}}
+Content-Type: application/json
+
+[{
+  "id": "event-id",
+  "topic": "{{topic}}",
+  "subject": "{{subject}}",
+  "data": {
+    "operationName": "Microsoft.Compute/virtualMachines/poweroff/action",
+    "status": "Succeeded"
+  },
+  "eventType": "Microsoft.Resources.ResourceActionStart",
+  "eventTime": "{{$isoTimestamp}}"
+}]
+### Azure Poweroff Success Event
+POST {{azureWebHookUrl}}
+Content-Type: application/json
+
+[{
+  "id": "event-id",
+  "topic": "{{topic}}",
+  "subject": "{{subject}}",
+  "data": {
+    "operationName": "Microsoft.Compute/virtualMachines/poweroff/action",
+    "status": "Succeeded"
+  },
+  "eventType": "Microsoft.Resources.ResourceActionSuccess",
+  "eventTime": "{{$isoTimestamp}}"
+}]
+### Azure Poweroff Cancel Event
+POST {{azureWebHookUrl}}
+Content-Type: application/json
+
+[{
+  "id": "event-id",
+  "topic": "{{topic}}",
+  "subject": "{{subject}}",
+  "data": {
+    "operationName": "Microsoft.Compute/virtualMachines/poweroff/action",
+    "status": "Succeeded"
+  },
+  "eventType": "Microsoft.Resources.ResourceActionCancel",
+  "eventTime": "{{$isoTimestamp}}"
+}]
+### Azure Poweroff Failure Event
+POST {{azureWebHookUrl}}
+Content-Type: application/json
+
+[{
+  "id": "event-id",
+  "topic": "{{topic}}",
+  "subject": "{{subject}}",
+  "data": {
+    "operationName": "Microsoft.Compute/virtualMachines/poweroff/action",
+    "status": "Succeeded"
+  },
+  "eventType": "Microsoft.Resources.ResourceActionFailure",
+  "eventTime": "{{$isoTimestamp}}"
+}]
+### Azure Write Success Event
+POST {{azureWebHookUrl}}
+Content-Type: application/json
+
+[{
+  "id": "event-id",
+  "topic": "{{topic}}",
+  "subject": "{{subject}}",
+  "data": {
+    "operationName": "Microsoft.Compute/virtualMachines/start/action",
+    "status": "Succeeded"
+  },
+  "eventType": "Microsoft.Resources.ResourceWriteSuccess",
+  "eventTime": "{{$isoTimestamp}}"
+}]
+### Azure Write Start Event
+POST {{azureWebHookUrl}}
+Content-Type: application/json
+
+[{
+  "id": "event-id",
+  "topic": "{{topic}}",
+  "subject": "{{subject}}",
+  "data": {
+    "operationName": "Microsoft.Compute/virtualMachines/start/action",
+    "status": "Succeeded"
+  },
+  "eventType": "Microsoft.Resources.ResourceWriteStart",
+  "eventTime": "{{$isoTimestamp}}"
+}]

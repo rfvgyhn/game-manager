@@ -20,6 +20,7 @@ Managed servers need to be specified in a config file.
 Sample `appsettings.json`:
 
     {
+        "AzureEventGridSharedSecret": "1234",
         "SseHeartbeatInterval": "00:00:30",
         "StatusPollingInterval": "00:00:05",
         "Servers": [
@@ -57,10 +58,12 @@ Sample `appsettings.json`:
         }
     }
 ### Config
-| Name                       | Type    | Required | Default | Description                                         | 
-|----------------------------|---------|----------|---------|-----------------------------------------------------|
-| SseHeartbeatInterval       | string  | No       | 30 sec  | How often to send SSE heartbeat messages to clients |
-| StatusPollingInterval      | string  | No       | 5 sec   | How often to poll the status of servers             |
+| Name                           | Type    | Required | Default | Description                                                                        | 
+|--------------------------------|---------|----------|---------|------------------------------------------------------------------------------------|
+| AzureEventGridSharedSecret     | string  | No       | Empty   | Secret used for Azure Event Grid event handshake                                   |
+| AzureEventGridSharedSecretFile | string  | No       | Empty   | Path to file whose content is the secret used for Azure Event Grid event handshake |
+| SseHeartbeatInterval           | string  | No       | 30 sec  | How often to send SSE heartbeat messages to clients                                |
+| StatusPollingInterval          | string  | No       | 5 sec   | How often to poll the status of servers                                            |
 
 ### Servers
 | Name                        | Type    | Required | Default | Description                                               | 
@@ -76,12 +79,37 @@ Sample `appsettings.json`:
 | Type.AzureVm.ResourceGroup  | string  | Yes      |         | Name of the resource group the virtual machine belongs to |
 | Type.AzureVm.SubscriptionId | string  | Yes      |         | Id of the subscription the resource group belongs to      |
 
-### Azure Permissions
+### Azure
+#### Permissions
 In order to start and get the status of VMs, this app needs the following permissions:
 * `Microsoft.Compute/virtualMachines/start/action`
 * `Microsoft.Compute/virtualMachines/instanceView/read`
 
 [Environment] and [Managed Identity] credentials are supported.
+
+#### Event Grid
+You can use Azure Event Grid to push status updates to this app. Configure your subscription to send events to
+the webhook `https://yourdomain/webhooks/azure/eventgrid?code=[AzureEventGridSharedSecret]`
+
+Add the Azure details to your config.
+```json
+{
+  "AzureAz": {
+   "Instance": "https://login.microsoftonline.com/",
+    "TenantId": "GUID",
+    "ClientId": "GUID"
+  }
+}
+```
+Get your tenant id with
+```sh
+az account show --query tenantId
+```
+
+Get your client id with
+```sh
+az ad app list --all --query "[].{Name:displayName, ClientID:appId, Domain:publisherDomain}" --output table
+```
 
 # Card Images
 
