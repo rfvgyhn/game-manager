@@ -11,7 +11,6 @@ let private layout (content: XmlNode list) =
             meta [_charset "utf-8"]
             meta [_name "viewport"; _content "width=device-width, initial-scale=1" ]
             title [] [encodedText "Game Manager"]
-            link [_rel "stylesheet"; _href "https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" ]
             link [_rel "stylesheet"; _href "https://cdnjs.cloudflare.com/ajax/libs/bulma/0.8.0/css/bulma.min.css" ]
             link [ _rel  "stylesheet"; _type "text/css"; _href "/main.css" ]
         ]
@@ -19,6 +18,14 @@ let private layout (content: XmlNode list) =
             section [_class "section"] [
                 yield! content                
             ]
+            rawText
+                """
+                <svg style="display: none;">
+                  <symbol id="icon-play" viewBox="0 0 448 512">
+                    <path d="M424.4 214.7L72.4 6.6C43.8-10.3 0 6.1 0 47.9V464c0 37.5 40.7 60.1 72.4 41.3l352-208c31.4-18.5 31.5-64.1 0-82.6z"/>
+                  </symbol>
+                </svg>
+                """
             script [
                 _src "https://unpkg.com/@digicreon/mujs@1.4.4/dist/mu.min.js"
                 _integrity "sha384-HOmrsf1xbQSkv1hsu7+gOO5LVzWpEJif8c/3sbuupYBt9DTk+PD5cn9khN324tvv"
@@ -37,7 +44,7 @@ let private startButton name state =
         ] |> String.concat " "
     form [ _class ""; _action action; _method "POST"; mu (Mode Patch) ] [
         button [ _type "submit"; _class classes; _title "Start Server" ] [
-            i [ _class "fa fa-play" ] []
+            rawText @"<svg class=""icon-play""><use href=""#icon-play""></use></svg>"
         ]
     ]
     

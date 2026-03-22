@@ -24,6 +24,9 @@ li {
     top: 0;
     left: 50%; 
     transform: translate(-50%, -50%);
+    display: inline-flex;
+    gap: .3rem;
+    transition: none;
 }
 
 .status .button {
@@ -32,9 +35,23 @@ li {
     height: auto;
 }
 
+.status button {
+    display: inline-flex;
+    align-items: center;
+}
+
+.status button svg {
+    height: 1em;
+    width: 1em;
+    fill: currentColor;
+}
+
+.icon-play {
+    transform: translateX(10%);
+}
+
 form {
     display: inline-flex;
-    margin-left: .3rem;
 }
 
 .card img {
