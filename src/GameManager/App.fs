@@ -196,14 +196,6 @@ let private echoAegValidationCode : HttpHandler = fun next ctx -> task {
         return! next ctx
 }
 
-let private requireEventGridAuth : HttpHandler = fun next ctx -> task {
-    let! authResult = ctx.AuthenticateAsync(JwtBearerDefaults.AuthenticationScheme)
-    if authResult.Succeeded then
-        return! next ctx
-    else
-        return unauthorized ctx
-}
-
 let private devEnvBypass (innerHandler : HttpHandler) : HttpHandler = fun next ctx ->
     let env = ctx.GetService<IWebHostEnvironment>()
     if env.IsDevelopment() then
@@ -273,7 +265,7 @@ let webApp eventGridSharedSecret : HttpHandler =
         POST >=> route  "/webhooks/azure/eventgrid"
                  >=> requireQueryValue "EventGrid shared secret" "code" eventGridSharedSecret
                  >=> echoAegValidationCode
-                 >=> (requireEventGridAuth |> devEnvBypass)
+                 >=> (requiresAuthentication (challenge "Bearer") |> devEnvBypass)
                  >=> azureStatusWebHook
         RequestErrors.NOT_FOUND "Not Found"
     ]
