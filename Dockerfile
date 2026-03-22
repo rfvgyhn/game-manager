@@ -1,18 +1,15 @@
-FROM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS restore
-WORKDIR /source/
-
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS restore
+WORKDIR /src
 COPY src/GameManager/*.fsproj ./
-RUN dotnet restore -r linux-musl-x64
-
+RUN dotnet restore -r linux-x64
 COPY src/GameManager/. ./
 
-FROM restore as build
-RUN dotnet publish -c release -o /app -r linux-musl-x64 --no-restore
-RUN rm -r /app/cs /app/de /app/es /app/fr /app/it /app/ja /app/ko /app/pl /app/pt-BR /app/ru /app/tr /app/zh-Hans /app/zh-Hant
+FROM restore AS build
+RUN dotnet publish -c release -o /app -r linux-x64 --no-restore --self-contained false
 
-FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine-amd64
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble-chiseled AS final
 WORKDIR /app
-COPY --from=build /app ./
+COPY --from=build --chown=1654:1654 /app ./
 ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
 ENTRYPOINT ["./GameManager"]
