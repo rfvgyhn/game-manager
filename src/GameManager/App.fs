@@ -36,13 +36,15 @@ let private buildRequest (ctx: HttpContext) server =
 let private getServer id (ctx: HttpContext) =
     getServerConfig ctx
     |> List.tryFind (fun c -> c.Id = id)
-    |> Option.map (fun server ->
-        let state = 
-            if server.Enabled then
-                (ctx.GetService<IStateTracker>().GetState server.Id).Current
-            else
-                Disabled
-        { server with State = state })
+    |> Option.map (fun server -> task {
+        if not server.Enabled then
+            return { server with State = Disabled }
+        else
+            let request = buildRequest ctx server
+            match! ServerHost.getState ctx.RequestAborted request with
+            | Ok s -> return { server with State = s }
+            | Result.Error e -> return { server with State = Error e }
+       })
 
 let private getServers (ctx: HttpContext) = task {
     let serverStates = ctx.GetService<IStateTracker>().GetAllStates()
@@ -88,20 +90,23 @@ let private indexHandler =
 let private startHandler name =
     fun next (ctx: HttpContext) -> task {        
         match getServer name ctx with
-        | Some server ->
+        | Some s ->
+            let! server = s
             let err msg = fun () -> Views.tag server.Id (ServerState.Error msg)
             let tag state = fun () -> Views.tag server.Id state
+            let notify state = ctx.GetService<IStateTracker>().Notify server.Id state DateTimeOffset.UtcNow
             match server.State with
             | Error e -> return! fragmentOrError (err e) (ServerErrors.INTERNAL_ERROR e) next ctx
             | Stopped ->
                 let request = buildRequest ctx server
                 match! ServerHost.start ctx.RequestAborted request with
                 | Ok state ->
-                    ctx.GetService<IStateTracker>().Notify server.Id state DateTimeOffset.UtcNow
+                    notify state
                     return! fragmentOrRedirect (tag state) "/" next ctx
                 | Result.Error m ->
                     return! fragmentOrError (err m) (ServerErrors.INTERNAL_ERROR m) next ctx
             | state ->
+                notify state
                 return! fragmentOrError (tag state) (RequestErrors.BAD_REQUEST "Can only start a stopped server") next ctx
         | None -> return! RequestErrors.NOT_FOUND "" next ctx
     }
