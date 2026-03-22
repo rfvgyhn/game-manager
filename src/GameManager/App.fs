@@ -36,15 +36,13 @@ let private buildRequest (ctx: HttpContext) server =
 let private getServer id (ctx: HttpContext) =
     getServerConfig ctx
     |> List.tryFind (fun c -> c.Id = id)
-    |> Option.map (fun server -> task {
-        if not server.Enabled then
-            return { server with State = Disabled }
-        else
-            let request = buildRequest ctx server
-            match! ServerHost.getState ctx.RequestAborted request with
-            | Ok s -> return { server with State = s }
-            | Result.Error e -> return { server with State = Error e }
-       })
+    |> Option.map (fun server ->
+        let state = 
+            if server.Enabled then
+                (ctx.GetService<IStateTracker>().GetState server.Id).Current
+            else
+                Disabled
+        { server with State = state })
 
 let private getServers (ctx: HttpContext) = task {
     let serverStates = ctx.GetService<IStateTracker>().GetAllStates()
@@ -90,8 +88,7 @@ let private indexHandler =
 let private startHandler name =
     fun next (ctx: HttpContext) -> task {        
         match getServer name ctx with
-        | Some s ->
-            let! server = s
+        | Some server ->
             let err msg = fun () -> Views.tag server.Id (ServerState.Error msg)
             let tag state = fun () -> Views.tag server.Id state
             match server.State with
