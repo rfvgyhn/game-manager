@@ -99,7 +99,9 @@ let private startHandler name =
             | Stopped ->
                 let request = buildRequest ctx server
                 match! ServerHost.start ctx.RequestAborted request with
-                | Ok state -> return! fragmentOrRedirect (tag state) "/" next ctx
+                | Ok state ->
+                    ctx.GetService<IStateTracker>().Notify server.Id state DateTimeOffset.UtcNow
+                    return! fragmentOrRedirect (tag state) "/" next ctx
                 | Result.Error m ->
                     return! fragmentOrError (err m) (ServerErrors.INTERNAL_ERROR m) next ctx
             | state ->
