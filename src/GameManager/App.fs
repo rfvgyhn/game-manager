@@ -93,16 +93,17 @@ let private startHandler name =
         | Some s ->
             let! server = s
             let err msg = fun () -> Views.tag server.Id (ServerState.Error msg)
+            let tag state = fun () -> Views.tag server.Id state
             match server.State with
             | Error e -> return! fragmentOrError (err e) (ServerErrors.INTERNAL_ERROR e) next ctx
             | Stopped ->
                 let request = buildRequest ctx server
                 match! ServerHost.start ctx.RequestAborted request with
-                | Ok state -> return! fragmentOrRedirect (fun () -> Views.tag server.Id state) "/" next ctx
+                | Ok state -> return! fragmentOrRedirect (tag state) "/" next ctx
                 | Result.Error m ->
                     return! fragmentOrError (err m) (ServerErrors.INTERNAL_ERROR m) next ctx
-            | _ ->
-                return! RequestErrors.BAD_REQUEST "Can only start a stopped server" next ctx
+            | state ->
+                return! fragmentOrError (tag state) (RequestErrors.BAD_REQUEST "Can only start a stopped server") next ctx
         | None -> return! RequestErrors.NOT_FOUND "" next ctx
     }
     
