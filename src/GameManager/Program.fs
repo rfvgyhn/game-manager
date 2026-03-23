@@ -127,6 +127,8 @@ let createAzureClient (serviceProvider: IServiceProvider) : Azure.IAzureClient =
 
 let configureServices (ctx: WebHostBuilderContext) (services : IServiceCollection) =
     let config = parseConfig ctx.Configuration
+    let fsharpJsonOptions = JsonFSharpOptions.Default().WithSkippableOptionFields()
+    let jsonOptions = JsonSerializerOptions(PropertyNameCaseInsensitive = true)
     services
         .Configure<ForwardedHeadersOptions>(fun (o: ForwardedHeadersOptions) -> o.ForwardedHeaders <- ForwardedHeaders.XForwardedFor)
         .AddResponseCaching()
@@ -136,6 +138,7 @@ let configureServices (ctx: WebHostBuilderContext) (services : IServiceCollectio
                 o.LoggingFields <- HttpLoggingFields.All ||| HttpLoggingFields.RequestQuery
             )
         .AddGiraffe()
+        .AddSingleton<Json.ISerializer>(Json.FsharpFriendlySerializer(fsharpJsonOptions, jsonOptions))
         .AddSingleton<IDockerClient>(fun _ -> (new DockerClientConfiguration(Uri("unix:///var/run/docker.sock"))).CreateClient() :> IDockerClient)
         .AddSingleton<Azure.IAzureClient>(createAzureClient)
         .AddSingleton<AppConfig>(config)

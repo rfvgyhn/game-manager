@@ -21,6 +21,23 @@ type ServerState =
     | Fetching
     | Error of string
     override this.ToString() = unionToString this
+module ServerState =
+    let private (|Eq|_|) (actual: string) (target: string) =
+        if actual.Equals(target, StringComparison.OrdinalIgnoreCase) then Some ()
+        else None
+    let tryParse (s: string) (description: string option) (progress: float option) =
+        match s with
+        | Eq "created" -> Some Created
+        | Eq "creating" -> Some Creating
+        | Eq "disabled" -> Some Disabled
+        | Eq "fetching" -> Some Fetching
+        | Eq "initializing" -> Some (Initializing {| Description = description; Progress = progress |})
+        | Eq "running" -> Some Running
+        | Eq "starting" -> Some Starting
+        | Eq "stopped" -> Some Stopped
+        | Eq "stopping" -> Some Stopping
+        | Eq "unknown" -> Some Unknown
+        | _ -> None
         
 type AzureVmConfig = { SubscriptionId: string; ResourceGroup: string; VmName: string }
 type DockerConfig = { Name: string }

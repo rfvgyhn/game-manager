@@ -1,6 +1,7 @@
 @topic = /subscriptions/{{subId}}/resourceGroups/{{resourceGroup}}
 @subject = {{topic}}/providers/Microsoft.Compute/virtualMachines/{{vmName}}
 @azureWebHookUrl = localhost:5000/webhooks/azure/eventgrid?code=1234
+@stateWebHookUrl = localhost:5000/webhooks/state
 
 ### Azure Subscription Validation
 POST {{azureWebHookUrl}}
@@ -223,3 +224,25 @@ Content-Type: application/json
   "eventType": "Microsoft.Resources.ResourceWriteStart",
   "eventTime": "{{$isoTimestamp}}"
 }]
+
+### State Stopping
+POST {{stateWebHookUrl}}
+Content-Type: application/json
+
+{
+    "state": "stopping",
+    "serverId": "asdf",
+    "eventTime": "{{$isoTimestamp}}"
+}
+
+### State Initializing
+POST {{stateWebHookUrl}}
+Content-Type: application/json
+
+{
+    "state": "initializing",
+    "serverId": "asdf",
+    "eventTime": "{{$isoTimestamp}}",
+    "desc": "test step",
+    "progress": 0.5
+}

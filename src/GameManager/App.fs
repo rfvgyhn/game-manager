@@ -237,6 +237,31 @@ let private azureStatusWebHook : HttpHandler = fun next ctx -> task {
     return! setStatusCode 200 next ctx
 }
 
+
+[<CLIMutable>]
+type StatusEvent = { ServerId: string; State: string; EventTime: DateTimeOffset; Desc: string option; Progress: float option }
+let private setStateWebHook: HttpHandler = fun next ctx -> task {
+    let logger = getLogger ctx
+    let! event = ctx.BindJsonAsync<StatusEvent>()
+    let isMonitored() =
+        getServerConfig ctx |> List.exists (fun s -> s.Id = event.ServerId && s.Enabled && s.StatusMode.IsPush)
+
+    let result = 
+        if isMonitored() then
+            let stateTracker = ctx.GetService<IStateTracker>()
+            match ServerState.tryParse event.State event.Desc event.Progress with
+            | Some newState ->
+                stateTracker.Notify event.ServerId newState event.EventTime
+                Successful.NO_CONTENT
+            | None ->
+                RequestErrors.BAD_REQUEST "Unknown state"
+        else
+            logger.LogWarning("Received event for {ServerId} but it isn't configured for push events", event.ServerId)
+            Successful.NO_CONTENT
+
+    return! result next ctx
+}
+
 let private (|Prefix|_|) (prefix:string) (str:string) =
     if str.StartsWith(prefix) then
         Some(str.Substring(prefix.Length))
@@ -272,5 +297,8 @@ let webApp eventGridSharedSecret : HttpHandler =
                  >=> echoAegValidationCode
                  >=> (requiresAuthentication (challenge "Bearer") |> devEnvBypass)
                  >=> azureStatusWebHook
+        POST >=> route  "/webhooks/state"
+                 >=> (requiresAuthentication (challenge "Bearer") |> devEnvBypass)
+                 >=> setStateWebHook
         RequestErrors.NOT_FOUND "Not Found"
     ]
