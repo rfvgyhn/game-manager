@@ -235,6 +235,16 @@ Content-Type: application/json
     "eventTime": "{{$isoTimestamp}}"
 }
 
+### State Starting
+POST {{stateWebHookUrl}}
+Content-Type: application/json
+
+{
+    "state": "starting",
+    "serverId": "asdf",
+    "eventTime": "{{$isoTimestamp}}"
+}
+
 ### State Initializing
 POST {{stateWebHookUrl}}
 Content-Type: application/json

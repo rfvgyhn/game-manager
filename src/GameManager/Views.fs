@@ -35,6 +35,9 @@ let private layout (content: XmlNode list) =
         ]
     ]
 
+let private spinner() =
+    span [ _class "button is-small rounded is-info is-loading" ] [ ]
+
 let private startButton name state =
     let action = $"/servers/%s{name}/start"
     let classes =
@@ -58,18 +61,17 @@ let tag id state =
         | Created
         | Starting -> ("is-info", "", None)
         | Disabled -> ("", "", None)
-        | Initializing s ->
-            let progress = s.Progress |> Option.map (fun p -> $"Initializing {p:P}") |> Option.defaultValue "Initializing"
-            ("is-info is-loading", s.Description |> Option.defaultValue "", Some progress)
+        | Initializing s -> ("is-info", "", None)
         | Fetching -> ("is-info is-loading", "Fetching status", None)
         | ServerState.Unknown -> ("is-info", "", None)
         | Error m -> ("is-danger", m, None)
 
     span [_class "status"; mu (PatchTarget $"#%s{id} .status") ] [
         span [_class $"tag %s{cssClass}"; _title title] [
-            text |> Option.defaultWith(fun () -> state.ToString()) |> encodedText
+            text |> Option.defaultWith(fun () -> ServerState.asString state) |> encodedText
         ]
-        if state = Stopped || state = Starting then startButton id state
+        if state.IsStopped || state.IsStarting then startButton id state
+        if state.IsInitializing then spinner()
     ]
     
 

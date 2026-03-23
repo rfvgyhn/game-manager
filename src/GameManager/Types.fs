@@ -38,7 +38,16 @@ module ServerState =
         | Eq "stopping" -> Some Stopping
         | Eq "unknown" -> Some Unknown
         | _ -> None
-        
+    let asString (s: ServerState) =
+        match s with
+        | Initializing i ->
+            match i.Description, i.Progress with
+            | Some d, Some p -> $"{d} {p:P0}"
+            | Some d, None -> d
+            | None, Some p -> $"Initializing {p:P0}"
+            | None, None -> "Initializing"
+        | _ -> unionToString s
+
 type AzureVmConfig = { SubscriptionId: string; ResourceGroup: string; VmName: string }
 type DockerConfig = { Name: string }
 [<RequireQualifiedAccess>]
