@@ -135,13 +135,17 @@ module AzureEvent =
     | Success "start" -> ServerState.Created
     | _ -> ServerState.Unknown 
     
-    let private mapAction prevState = function
+    let private mapAction prevState supportsInitialization = function
     | Start "deallocate"
     | Start "poweroff" -> ServerState.Stopping
     | Start "start" -> ServerState.Starting
     | Success "deallocate"
     | Success "poweroff" -> ServerState.Stopped
-    | Success "start" -> ServerState.Running
+    | Success "start" ->
+        if supportsInitialization then
+            ServerState.Initializing (None, None)
+        else
+            ServerState.Running
     | Cancel "deallocate" -> prevState
     | Cancel "poweroff" -> ServerState.Running
     | Cancel "start" -> ServerState.Stopped   
@@ -152,22 +156,26 @@ module AzureEvent =
     | "Unavailable" -> ServerState.Stopped
     | _ -> ServerState.Unknown
     
-    let mapToState (prevState: ServerState) (event: AzureEvent) =
+    let mapToState (prevState: ServerState) (event: AzureEvent) (supportsInitialization: bool) =
         match event with
         | ResourceWrite (type', operation) -> mapWrite (type', operation)
-        | ResourceAction (type', operation) -> mapAction prevState (type', operation)
+        | ResourceAction (type', operation) -> mapAction prevState supportsInitialization (type', operation)
         | AvailabilityStatus status -> mapStatusChange status
         | AzureEvent.Failure msg -> ServerState.Error msg
         | Unknown -> ServerState.Unknown
 
 type private Statuses = { Provisioning: string option; Power: string option }
-let private mapStatuses (statuses: Statuses) =
+let private mapStatuses supportsInitialization (statuses: Statuses) =
     //  https://learn.microsoft.com/en-us/azure/virtual-machines/states-billing#power-states-and-billing
     match statuses.Provisioning, statuses.Power with
     | Some "updating", None -> ServerState.Starting
     | _, Some "creating" -> ServerState.Starting
     | _, Some "starting" -> ServerState.Starting
-    | _, Some "running" -> ServerState.Running
+    | _, Some "running" ->
+        if supportsInitialization then
+            ServerState.Initializing (None, None)
+        else
+            ServerState.Running
     | _, Some "stopping" -> ServerState.Stopping
     | _, Some "stopped" -> ServerState.Stopped
     | _, Some "deallocating" -> ServerState.Stopping
@@ -194,7 +202,7 @@ let (|VmPath|_|) (path: string) =
 
 let formatId resourceGroup vmName = $"{resourceGroup}_{vmName}"
 
-let getState (logger: ILogger) (client: IAzureClient) ct config =
+let getState (logger: ILogger) (client: IAzureClient) ct (supportsInitialization: bool) config =
     task {
         let err() = Result.Error "Unable to get status"
         let resId = VirtualMachineResource.CreateResourceIdentifier(config.SubscriptionId, config.ResourceGroup, config.VmName)
@@ -214,7 +222,7 @@ let getState (logger: ILogger) (client: IAzureClient) ct config =
                 let powerState = getCode "PowerState" 
                 let provisioningState = getCode "ProvisioningState"
                 
-                return mapStatuses { Power = powerState; Provisioning = provisioningState } |> Ok
+                return mapStatuses supportsInitialization { Power = powerState; Provisioning = provisioningState } |> Ok
         | None -> return err()
     }
     |> sendRequest logger
@@ -224,11 +232,10 @@ let getStates (logger: ILogger) (client: IAzureClient) ct configs : Task<Map<Ser
     // one request per vm
     // https://learn.microsoft.com/en-us/rest/api/compute/virtual-machines/list?tabs=dotnet
     task {
-        let get = (getState logger client ct) >> (sendRequest logger)
         let! states =
             configs
-            |> List.map (fun (s, c) -> task {
-                let! state = get c
+            |> List.map (fun (s: Server, c) -> task {
+                let! state = getState logger client ct s.SupportsInitialization c
                 return s, state
             })
             |> Task.WhenAll

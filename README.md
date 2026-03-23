@@ -28,6 +28,7 @@ Sample `appsettings.json`:
                 "DisplayName": "Server1 - Name",
                 "DisplayImage": "server1.png",
                 "Notes": "Some notes about this container",
+                "StatusMode": "Pull",
                 "Type": {
                     "Docker": {
                         "Name": "container_name"
@@ -38,7 +39,10 @@ Sample `appsettings.json`:
                 "DisplayName": "Server2 - Name",
                 "DisplayImage": "server2.png",
                 "Enabled": false,
-                "StatusMode": "Push",
+                "StatusMode": {
+                "Push": {
+                    "SupportsInitialization": true
+                },
                 "Type": {
                     "AzureVm": {
                         "VmName": "vm-name",
@@ -66,18 +70,19 @@ Sample `appsettings.json`:
 | StatusPollingInterval          | string  | No       | 5 sec   | How often to poll the status of servers                                            |
 
 ### Servers
-| Name                        | Type    | Required | Default | Description                                               | 
-|-----------------------------|---------|----------|---------|-----------------------------------------------------------|
-| DisplayName                 | string  | Yes      |         | The text that shows up in the card title                  |
-| DisplayImage                | string  | No       | Empty   | Path to card image relative to the `cards` directory      |
-| Enabled                     | boolean | No       | false   | Allow users to interact with container                    |
-| Notes                       | string  | No       | Empty   | Optional text that shows up in the card description       |
-| StatusMode                  | string  | No       | Pull    | How to retrieve server status (Push/Pull)                 |
-| Type                        | object  | Yes      |         | Can be Docker or AzureVM                                  |
-| Type.Docker.Name            | string  | Yes      |         | Name of docker container                                  |
-| Type.AzureVm.VmName         | string  | Yes      |         | Name of Azure virtual machine                             |
-| Type.AzureVm.ResourceGroup  | string  | Yes      |         | Name of the resource group the virtual machine belongs to |
-| Type.AzureVm.SubscriptionId | string  | Yes      |         | Id of the subscription the resource group belongs to      |
+| Name                                   | Type    | Required | Default | Description                                                  | 
+|----------------------------------------|---------|----------|---------|--------------------------------------------------------------|
+| DisplayName                            | string  | Yes      |         | The text that shows up in the card title                     |
+| DisplayImage                           | string  | No       | Empty   | Path to card image relative to the `cards` directory         |
+| Enabled                                | boolean | No       | false   | Allow users to interact with container                       |
+| Notes                                  | string  | No       | Empty   | Optional text that shows up in the card description          |
+| StatusMode                             | string  | No       | Pull    | How to retrieve server status (Push/Pull)                    |
+| StatusMode.Push.SupportsInitialization | boolean | No       | false   | Will receive initialization updates after server has started |
+| Type                                   | object  | Yes      |         | Can be Docker or AzureVM                                     |
+| Type.Docker.Name                       | string  | Yes      |         | Name of docker container                                     |
+| Type.AzureVm.VmName                    | string  | Yes      |         | Name of Azure virtual machine                                |
+| Type.AzureVm.ResourceGroup             | string  | Yes      |         | Name of the resource group the virtual machine belongs to    |
+| Type.AzureVm.SubscriptionId            | string  | Yes      |         | Id of the subscription the resource group belongs to         |
 
 ### Azure
 #### Permissions

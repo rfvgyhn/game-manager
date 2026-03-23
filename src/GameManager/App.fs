@@ -30,7 +30,7 @@ let private buildRequest (ctx: HttpContext) server =
     let dockerClient, azureClient = getClients ctx
     let logger = getLogger ctx
     match server.Type with
-    | ServerType.AzureVm c -> ServerHost.Request.AzureVm (logger, azureClient, c)
+    | ServerType.AzureVm c -> ServerHost.Request.AzureVm (logger, azureClient, c, server.SupportsInitialization)
     | ServerType.Docker _ -> ServerHost.Request.Docker (logger, dockerClient, server.Id)
 
 let private getServer id (ctx: HttpContext) =
@@ -220,16 +220,14 @@ let private azureStatusWebHook : HttpHandler = fun next ctx -> task {
         match node["subject"] |> JsonNode.asStr |> Option.defaultValue "" with
         | Azure.VmPath (subId, resGroup, vmName) ->
             let id = Azure.formatId resGroup vmName
-            let isMonitored() =
-                getServerConfig ctx |> List.exists (fun s -> s.Id = id && s.Enabled && s.StatusMode.IsPush)            
-            
-            if isMonitored() then
+            match getServerConfig ctx |> List.tryFind (fun s -> s.Id = id && s.Enabled && s.StatusMode.IsPush) with
+            | Some config ->
                 let stateTracker = ctx.GetService<IStateTracker>()
                 let event, timestamp = Azure.AzureEvent.parse node
                 let state = stateTracker.GetState id
-                let newState = Azure.AzureEvent.mapToState state.Prev event
+                let newState = Azure.AzureEvent.mapToState state.Prev event config.SupportsInitialization
                 stateTracker.Notify id newState timestamp
-            else
+            | None ->
                 logger.LogWarning("Received event for {ServerId} but it isn't configured for push events", id)
         | _ ->
             logger.LogWarning("Unexpected Azure event: {json}", node)

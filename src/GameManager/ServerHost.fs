@@ -9,7 +9,7 @@ open Types
 
 [<RequireQualifiedAccess>]
 type Request =
-    | AzureVm of (ILogger * Azure.IAzureClient * AzureVmConfig)
+    | AzureVm of (ILogger * Azure.IAzureClient * AzureVmConfig * bool)
     | Docker of (ILogger * IDockerClient * string)
     
 type GetAllRequest = {
@@ -42,10 +42,10 @@ let getStates ct request : Task<Map<Server, Result<ServerState, string>>> = task
     
 let getState ct request : Task<Result<ServerState, string>> =
     match request with
-    | Request.AzureVm (logger, client, config) -> Azure.getState logger client ct config
+    | Request.AzureVm (logger, client, config, s) -> Azure.getState logger client ct s config
     | Request.Docker (logger, client, id) -> Docker.getState ct logger client id
 
 let start ct request : Task<Result<ServerState, string>> =
     match request with
-    | Request.AzureVm (logger, client, config) -> Azure.start logger client ct config
+    | Request.AzureVm (logger, client, config, _) -> Azure.start logger client ct config
     | Request.Docker (logger, client, id) -> Docker.start ct logger client id

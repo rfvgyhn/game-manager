@@ -59,11 +59,11 @@ let tag id state =
         | Running -> ("is-success", "", None)
         | Creating
         | Created
+        | Initializing _
+        | ServerState.Unknown
         | Starting -> ("is-info", "", None)
         | Disabled -> ("", "", None)
-        | Initializing s -> ("is-info", "", None)
         | Fetching -> ("is-info is-loading", "Fetching status", None)
-        | ServerState.Unknown -> ("is-info", "", None)
         | Error m -> ("is-danger", m, None)
 
     span [_class "status"; mu (PatchTarget $"#%s{id} .status") ] [
@@ -73,7 +73,6 @@ let tag id state =
         if state.IsStopped || state.IsStarting then startButton id state
         if state.IsInitializing then spinner()
     ]
-    
 
 let card server =
     let image =

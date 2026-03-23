@@ -59,6 +59,7 @@ let parseConfig (config: IConfiguration) =
                           .WithUnionUnwrapFieldlessTags()
                           .WithSkippableOptionFields()
                           .ToJsonSerializerOptions()
+    jsonOptions.PropertyNameCaseInsensitive <- true
     let parseServers fileName =
         if File.Exists(fileName) then
             use stream = File.OpenRead(fileName)

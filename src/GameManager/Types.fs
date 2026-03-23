@@ -13,7 +13,7 @@ type ServerState =
     | Created
     | Running
     | Starting
-    | Initializing of {| Description: string option; Progress: float option |}
+    | Initializing of description: string option * progress: float option
     | Stopped
     | Stopping
     | Unknown
@@ -31,7 +31,7 @@ module ServerState =
         | Eq "creating" -> Some Creating
         | Eq "disabled" -> Some Disabled
         | Eq "fetching" -> Some Fetching
-        | Eq "initializing" -> Some (Initializing {| Description = description; Progress = progress |})
+        | Eq "initializing" -> (description, progress) |> Initializing |> Some
         | Eq "running" -> Some Running
         | Eq "starting" -> Some Starting
         | Eq "stopped" -> Some Stopped
@@ -40,8 +40,8 @@ module ServerState =
         | _ -> None
     let asString (s: ServerState) =
         match s with
-        | Initializing i ->
-            match i.Description, i.Progress with
+        | Initializing (desc, progress) ->
+            match desc, progress with
             | Some d, Some p -> $"{d} {p:P0}"
             | Some d, None -> d
             | None, Some p -> $"Initializing {p:P0}"
@@ -58,7 +58,7 @@ type ServerType =
           match self with
           | ServerType.AzureVm c -> $"{c.ResourceGroup}_{c.VmName}"
           | ServerType.Docker c -> c.Name
-type ServerStatusMode = Pull | Push
+type ServerStatusMode = Pull | Push of supportsInitialization: bool option
 type Server = {
     DisplayName: string
     DisplayImage: string
@@ -69,6 +69,7 @@ type Server = {
     StatusMode: ServerStatusMode
 } with
     member self.Id = self.Type.Id
+    member self.SupportsInitialization = match self.StatusMode with Push s -> s |> Option.defaultValue false | _ -> false
 
 [<RequireQualifiedAccess>]
 type ServerConfig = {
