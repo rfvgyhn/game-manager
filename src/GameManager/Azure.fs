@@ -120,9 +120,6 @@ module AzureEvent =
     let private (|Op|_|) (opTarget: string) (operation: string) =
         if operation.Contains(opTarget + "/action", StringComparison.OrdinalIgnoreCase) then Some ()
         else None
-    
-    let private (|Start|_|) (search: string) (event: string, operation: string) =
-        matchOp "Start" search event operation
 
     let private (|Success|_|) (search: string) (event: string, operation: string) =
         matchOp "Success" search event operation
@@ -131,14 +128,10 @@ module AzureEvent =
         matchOp "Cancel" search event operation
     
     let private mapWrite = function
-    | Start "start" -> ServerState.Creating
     | Success "start" -> ServerState.Created
     | _ -> ServerState.Unknown 
     
     let private mapAction prevState supportsInitialization = function
-    | Start "deallocate"
-    | Start "poweroff" -> ServerState.Stopping
-    | Start "start" -> ServerState.Starting
     | Success "deallocate"
     | Success "poweroff" -> ServerState.Stopped
     | Success "start" ->

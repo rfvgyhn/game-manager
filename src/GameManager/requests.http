@@ -14,21 +14,6 @@ aeg-event-type: SubscriptionValidation
   }
 }]
 
-### Azure Deallocate Start Event
-POST {{azureWebHookUrl}}
-Content-Type: application/json
-
-[{
-  "id": "event-id",
-  "topic": "{{topic}}",
-  "subject": "{{subject}}",
-  "data": {
-    "operationName": "Microsoft.Compute/virtualMachines/deallocate/action",
-    "status": "Succeeded"
-  },
-  "eventType": "Microsoft.Resources.ResourceActionStart",
-  "eventTime": "{{$isoTimestamp}}"
-}]
 ### Azure Deallocate Success Event
 POST {{azureWebHookUrl}}
 Content-Type: application/json
@@ -74,21 +59,7 @@ Content-Type: application/json
   "eventType": "Microsoft.Resources.ResourceActionFailure",
   "eventTime": "{{$isoTimestamp}}"
 }]
-### Azure Start Start Event
-POST {{azureWebHookUrl}}
-Content-Type: application/json
 
-[{
-  "id": "event-id",
-  "topic": "{{topic}}",
-  "subject": "{{subject}}",
-  "data": {
-    "operationName": "Microsoft.Compute/virtualMachines/start/action",
-    "status": "Succeeded"
-  },
-  "eventType": "Microsoft.Resources.ResourceActionStart",
-  "eventTime": "{{$isoTimestamp}}"
-}]
 ### Azure Start Success Event
 POST {{azureWebHookUrl}}
 Content-Type: application/json
@@ -134,21 +105,7 @@ Content-Type: application/json
   "eventType": "Microsoft.Resources.ResourceActionFailure",
   "eventTime": "{{$isoTimestamp}}"
 }]
-### Azure Poweroff Start Event
-POST {{azureWebHookUrl}}
-Content-Type: application/json
 
-[{
-  "id": "event-id",
-  "topic": "{{topic}}",
-  "subject": "{{subject}}",
-  "data": {
-    "operationName": "Microsoft.Compute/virtualMachines/poweroff/action",
-    "status": "Succeeded"
-  },
-  "eventType": "Microsoft.Resources.ResourceActionStart",
-  "eventTime": "{{$isoTimestamp}}"
-}]
 ### Azure Poweroff Success Event
 POST {{azureWebHookUrl}}
 Content-Type: application/json
@@ -209,22 +166,6 @@ Content-Type: application/json
   "eventType": "Microsoft.Resources.ResourceWriteSuccess",
   "eventTime": "{{$isoTimestamp}}"
 }]
-### Azure Write Start Event
-POST {{azureWebHookUrl}}
-Content-Type: application/json
-
-[{
-  "id": "event-id",
-  "topic": "{{topic}}",
-  "subject": "{{subject}}",
-  "data": {
-    "operationName": "Microsoft.Compute/virtualMachines/start/action",
-    "status": "Succeeded"
-  },
-  "eventType": "Microsoft.Resources.ResourceWriteStart",
-  "eventTime": "{{$isoTimestamp}}"
-}]
-
 ### State Stopping
 POST {{stateWebHookUrl}}
 Content-Type: application/json
