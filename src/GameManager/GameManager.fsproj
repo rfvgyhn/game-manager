@@ -36,6 +36,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="requests.http" />
+    <None Include="../../azure-events/*.json">
+      <Link>azureevents/%(RecursiveDir)%(FileName)%(Extension)</Link>
+    </None>
+    <None Include="requests.http" />
   </ItemGroup>
 </Project>

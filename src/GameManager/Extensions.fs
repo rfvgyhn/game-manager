@@ -1,6 +1,7 @@
 [<AutoOpen>]
 module Extensions
 
+open System
 open Giraffe
 open Microsoft.AspNetCore.Http
 
@@ -12,6 +13,12 @@ module JsonNode =
     open System.Text.Json.Nodes
     let asStr (prop: JsonNode) = prop |> Option.ofObj |> Option.map _.ToString()
     let getValue (node: JsonNode) (key: string) = if isNull node then null else node[key]
+
+module DateTimeOffset =
+    let tryParse (input: string) =
+        match DateTimeOffset.TryParse input with
+        | true, dt -> Some dt
+        | _ -> None
 
 module AsyncEnumerable =
     open System.Collections.Generic

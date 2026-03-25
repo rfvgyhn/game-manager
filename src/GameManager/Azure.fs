@@ -76,6 +76,7 @@ type AzureEvent =
     | ResourceAction of type': string * operation: string
     | ResourceWrite of type': string * operation: string
     | AvailabilityStatus of state: string
+    | ResourceAnnotated of name: string
     | Failure of string
     | Unknown
 
@@ -84,14 +85,13 @@ module AzureEvent =
     
     // https://github.com/MicrosoftDocs/azure-docs/blob/main/articles/event-grid/event-schema-resource-groups.md#event-grid-event-schema
     // https://github.com/MicrosoftDocs/azure-docs/blob/main/articles/event-grid/event-schema-health-resources.md
+    // https://learn.microsoft.com/en-us/azure/service-health/resource-health-vm-annotation
     let parse (event: JsonNode) =
         let nodeToStr prop = prop |> JsonNode.asStr |> Option.defaultValue ""
         let (?>) = JsonNode.getValue
         let eventType = event["eventType"] |> nodeToStr
         let eventTime = 
-            match DateTimeOffset.TryParse(event["eventTime"] |> nodeToStr) with
-            | true, dt -> dt
-            | _ -> DateTimeOffset.UtcNow
+            event["eventTime"] |> nodeToStr |> DateTimeOffset.tryParse |> Option.defaultValue DateTimeOffset.UtcNow
         let lastUpperCaseWord (input: string) =
             match input |> Seq.tryFindIndexBack Char.IsUpper with
             | Some i -> input.Substring(i)
@@ -103,15 +103,22 @@ module AzureEvent =
         
         match eventType with
         | "Microsoft.ResourceNotifications.HealthResources.AvailabilityStatusChanged" ->
-            event ?> "data" ?> "resourceInfo" ?> "properties" ?> "availabilityState" |> nodeToStr |> AvailabilityStatus
+            let props = event ?> "data" ?> "resourceInfo" ?> "properties"
+            let state = props ?>  "availabilityState" |> nodeToStr
+            let timestamp = props ?> "occurredTime" |> nodeToStr |> DateTimeOffset.tryParse
+            AvailabilityStatus state, timestamp |> Option.defaultValue eventTime
+        | "Microsoft.ResourceNotifications.HealthResources.ResourceAnnotated" ->
+            let props = event ?> "data" ?> "resourceInfo" ?> "properties"
+            let name = props ?> "annotationName" |> nodeToStr
+            let timestamp = props ?> "occurredTime" |> nodeToStr |> DateTimeOffset.tryParse
+            ResourceAnnotated name, timestamp |> Option.defaultValue eventTime
         | t when t.EndsWith("Failure") ->
-            event ?> "data" ?> "message" |> nodeToStr |> Failure
+            event ?> "data" ?> "message" |> nodeToStr |> Failure, eventTime
         | t when t.StartsWith("Microsoft.Resources.ResourceWrite") ->
-            parseResource t |> ResourceWrite
+            parseResource t |> ResourceWrite, eventTime
         | t when t.StartsWith("Microsoft.Resources.ResourceAction") ->
-            parseResource t |> ResourceAction
-        | _ -> Unknown
-        , eventTime
+            parseResource t |> ResourceAction, eventTime
+        | _ -> Unknown, eventTime
     
     let private matchOp (eventTarget: string) (opTarget: string) (event: string) (operation: string) =
         if event = eventTarget && operation.Contains(opTarget + "/action", StringComparison.OrdinalIgnoreCase) then Some ()
@@ -149,11 +156,18 @@ module AzureEvent =
     | "Unavailable" -> ServerState.Stopped
     | _ -> ServerState.Unknown
     
+    let private mapAnnotation = function
+    | "VirtualMachineDeallocationInitiated" -> ServerState.Stopping
+    | "VirtualMachineAllocated"
+    | "VirtualMachineStartInitiatedByControlPlane" -> ServerState.Starting
+    | _ -> ServerState.Unknown
+    
     let mapToState (prevState: ServerState) (event: AzureEvent) (supportsInitialization: bool) =
         match event with
         | ResourceWrite (type', operation) -> mapWrite (type', operation)
         | ResourceAction (type', operation) -> mapAction prevState supportsInitialization (type', operation)
         | AvailabilityStatus status -> mapStatusChange status
+        | ResourceAnnotated name -> mapAnnotation name
         | AzureEvent.Failure msg -> ServerState.Error msg
         | Unknown -> ServerState.Unknown
 

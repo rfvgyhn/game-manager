@@ -226,6 +226,10 @@ let private azureStatusWebHook : HttpHandler = fun next ctx -> task {
                 let event, timestamp = Azure.AzureEvent.parse node
                 let state = stateTracker.GetState id
                 let newState = Azure.AzureEvent.mapToState state.Prev event config.SupportsInitialization
+                
+                if newState.IsUnknown then
+                    logger.LogWarning("Unrecognized Azure event for server {ServerId}: {json}", id, node)
+                
                 stateTracker.Notify id newState timestamp
             | None ->
                 logger.LogWarning("Received event for {ServerId} but it isn't configured for push events", id)
