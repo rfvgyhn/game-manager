@@ -44,6 +44,7 @@ let configureApp (app : IApplicationBuilder) =
         .UseStaticFiles()
         .UseResponseCaching()
         .UseHttpLogging()
+        .UseAuthentication()
         .UseGiraffe (App.webApp config.AzureEventGridSharedSecret)
 
 // Can't use built-in configuration builder since it can't bind DUs
