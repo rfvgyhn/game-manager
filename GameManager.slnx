@@ -14,4 +14,7 @@
   <Folder Name="/src/">
     <Project Path="src/GameManager/GameManager.fsproj" />
   </Folder>
+  <Folder Name="/docs/">
+    <File Path="docs/azure.md" />
+  </Folder>
 </Solution>
