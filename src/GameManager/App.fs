@@ -289,6 +289,8 @@ let private logStartRequest next (ctx: HttpContext) =
     logger.LogInformation $"User '%s{user}' from %A{ipAddress} requested to start server"
     next ctx
     
+let private requiresWebhookRole : HttpHandler = (requiresRole "Webhook.Post" (challenge "Bearer") |> devEnvBypass)
+
 let webApp eventGridSharedSecret : HttpHandler =
     choose [
         GET  >=> route  "/" >=> indexHandler
@@ -297,10 +299,13 @@ let webApp eventGridSharedSecret : HttpHandler =
         POST >=> route  "/webhooks/azure/eventgrid"
                  >=> requireQueryValue "EventGrid shared secret" "code" eventGridSharedSecret
                  >=> echoAegValidationCode
-                 >=> (requiresAuthentication (challenge "Bearer") |> devEnvBypass)
+                 >=> requiresWebhookRole
                  >=> azureStatusWebHook
+        HEAD >=> route  "/webhooks/state"
+                 >=> requiresWebhookRole
+                 >=> setStatusCode 200
         POST >=> route  "/webhooks/state"
-                 >=> (requiresAuthentication (challenge "Bearer") |> devEnvBypass)
+                 >=> requiresWebhookRole
                  >=> setStateWebHook
         RequestErrors.NOT_FOUND "Not Found"
     ]
