@@ -1,5 +1,6 @@
 module GameManager.Program
 
+open System.Net
 open System.Reflection
 open Azure.Identity
 open Azure.ResourceManager
@@ -133,7 +134,17 @@ let configureServices (ctx: WebHostBuilderContext) (services : IServiceCollectio
     let fsharpJsonOptions = JsonFSharpOptions.Default().WithSkippableOptionFields()
     let jsonOptions = JsonSerializerOptions(PropertyNameCaseInsensitive = true)
     services
-        .Configure<ForwardedHeadersOptions>(fun (o: ForwardedHeadersOptions) -> o.ForwardedHeaders <- ForwardedHeaders.XForwardedFor)
+        .Configure<ForwardedHeadersOptions>(fun (o: ForwardedHeadersOptions) ->
+            ctx.Configuration.GetSection("ForwardedHeaders:Options").Bind(o)
+            ctx.Configuration.GetSection("ForwardedHeaders:KnownProxies").Get<string>()
+            |> Option.ofObj
+            |> Option.map _.Split([|','|], StringSplitOptions.RemoveEmptyEntries)
+            |> Option.iter (fun addresses ->
+                for address in addresses do
+                    o.KnownProxies.Add(address.Trim() |> IPAddress.Parse)
+                )
+                
+        )
         .Configure<HttpLoggingOptions>(ctx.Configuration.GetSection("Logging:Http"))
         .AddResponseCaching()
         .AddCors()

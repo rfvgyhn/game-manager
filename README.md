@@ -59,6 +59,12 @@ Sample `appsettings.json`:
                 "System": "Error",
                 "Microsoft": "Error"
             }
+        },
+        "ForwardedHeaders": {
+            "Options": {
+                "ForwardedHeaders": "XForwardedFor"
+            },
+            "KnownProxies": "172.17.0.1, 172.17.0.2"
         }
     }
 ### Config
