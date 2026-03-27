@@ -4,8 +4,6 @@ open Docker.DotNet
 open FSharp.Control
 open Giraffe
 open Giraffe.ViewEngine
-open Microsoft.AspNetCore.Authentication
-open Microsoft.AspNetCore.Authentication.JwtBearer
 open Microsoft.AspNetCore.Hosting
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Http.Features
