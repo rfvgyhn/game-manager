@@ -1,5 +1,6 @@
 module GameManager.Program
 
+open System.Reflection
 open Azure.Identity
 open Azure.ResourceManager
 open Docker.DotNet
@@ -154,9 +155,12 @@ let configureServices (ctx: WebHostBuilderContext) (services : IServiceCollectio
 let configureLogging (builder : ILoggingBuilder) =
     builder.AddConsole()
            .AddDebug() |> ignore
+         
+let private getLogger (services: IServiceProvider) =
+    services.GetService<ILoggerFactory>().CreateLogger($"{nameof(GameManager)}.Program")
            
 let private initStates (services: IServiceProvider) = task {
-    let logger = services.GetService<ILoggerFactory>().CreateLogger($"{nameof(GameManager)}.Program")
+    let logger = getLogger services
     let statusService = services.GetService<IStateTracker>()
     let serverConfig = services.GetService<AppConfig>().Servers
     let enabledServers = serverConfig |> List.filter _.Enabled    
@@ -196,7 +200,13 @@ let main args =
                         .ConfigureLogging(configureLogging)
                         |> ignore
                  ).Build()
-    
+    let version = typeof<ServerState>.Assembly
+                      .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+                      |> Option.ofObj
+                      |> Option.map _.InformationalVersion
+                      |> Option.defaultValue "0.0.0"
+
+    (getLogger app.Services).LogInformation("Game Manaager - v{Version}", version)
     (initStates app.Services).GetAwaiter().GetResult()
     app.Run()
     0
