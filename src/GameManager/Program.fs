@@ -134,12 +134,10 @@ let configureServices (ctx: WebHostBuilderContext) (services : IServiceCollectio
     let jsonOptions = JsonSerializerOptions(PropertyNameCaseInsensitive = true)
     services
         .Configure<ForwardedHeadersOptions>(fun (o: ForwardedHeadersOptions) -> o.ForwardedHeaders <- ForwardedHeaders.XForwardedFor)
+        .Configure<HttpLoggingOptions>(ctx.Configuration.GetSection("Logging:Http"))
         .AddResponseCaching()
         .AddCors()
-        .AddHttpLogging(fun o ->
-            if ctx.HostingEnvironment.IsDevelopment() then
-                o.LoggingFields <- HttpLoggingFields.All ||| HttpLoggingFields.RequestQuery
-            )
+        .AddHttpLogging()
         .AddGiraffe()
         .AddSingleton<Json.ISerializer>(Json.FsharpFriendlySerializer(fsharpJsonOptions, jsonOptions))
         .AddSingleton<IDockerClient>(fun _ -> (new DockerClientConfiguration(Uri("unix:///var/run/docker.sock"))).CreateClient() :> IDockerClient)
