@@ -6,7 +6,7 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <UserSecretsId>6a448cdd-7269-4714-9687-a5d66cfbcf5b</UserSecretsId>
     <InvariantGlobalization>true</InvariantGlobalization>
-    <VersionPrefix>1.0.1</VersionPrefix>
+    <VersionPrefix>1.1.0</VersionPrefix>
   </PropertyGroup>
   
   <ItemGroup>

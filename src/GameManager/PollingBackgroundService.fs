@@ -29,25 +29,26 @@ type PollingBackgroundService(
     }
     
     override _.ExecuteAsync(stoppingToken: CancellationToken) = task {
-        let stateRequest : ServerHost.GetAllRequest =
+        let enabledServers = config.Servers |> List.filter _.Enabled
+        let stateRequest() : ServerHost.GetAllRequest =
             { Logger = logger
               AzureClient = azureClient
               DockerClient = dockerClient
-              Servers = config.Servers |> List.filter (fun s -> s.Enabled && s.StatusMode.IsPull) }
+              Servers = enabledServers |> List.filter (fun s -> s.StatusMode.IsPull || statusService.GetState(s.Id).Current.IsUnknown) }
         
         try
             while not stoppingToken.IsCancellationRequested do
                 logger.LogInformation("Waiting for connection before polling states")
                 do! connectionTracker.WaitForAnyConnection(stoppingToken)
                 logger.LogInformation("State polling started; user connected")
-                do! getAndNotifyStates stoppingToken stateRequest
-                
+                do! getAndNotifyStates stoppingToken (stateRequest())
+
                 use timer = new PeriodicTimer(config.StatusPollingInterval)
                 while connectionTracker.Count > 0 && not stoppingToken.IsCancellationRequested do                    
                     let! _ = timer.WaitForNextTickAsync(stoppingToken)
                     if connectionTracker.Count > 0 then
-                        do! getAndNotifyStates stoppingToken stateRequest
-                
+                        do! getAndNotifyStates stoppingToken (stateRequest())
+
                 logger.LogInformation("State polling paused; no connected users")
         with :? OperationCanceledException -> ()
     }
